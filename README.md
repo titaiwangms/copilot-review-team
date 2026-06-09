@@ -109,3 +109,7 @@ instructions layer on top of (and win over) your global ones.
 - These are plain Copilot CLI custom agents — no servers, no external services.
 - Tested with Copilot CLI. Requires an account with access to the referenced
   models (swap as needed).
+
+## License
+
+[MIT](LICENSE) — do whatever you want with it.
