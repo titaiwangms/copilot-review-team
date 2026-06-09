@@ -5,7 +5,7 @@
 #   - Copies the local-* agent definitions into ~/.copilot/agents/
 #   - Installs the orchestration playbook as ~/.copilot/copilot-instructions.md
 #
-# Existing files are backed up to ~/.copilot/.backup-<timestamp>/ before being
+# Existing files are backed up to ~/.copilot/.backup-<timestamp>-<pid>/ before being
 # overwritten, so this is safe to re-run.
 
 set -euo pipefail
@@ -14,9 +14,17 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COPILOT_DIR="${COPILOT_HOME:-$HOME/.copilot}"
 AGENTS_DIR="$COPILOT_DIR/agents"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP_DIR="$COPILOT_DIR/.backup-$TIMESTAMP"
+# Include the PID so two runs within the same second can't clobber each other's
+# backups (which could otherwise overwrite the user's *original* files).
+BACKUP_DIR="$COPILOT_DIR/.backup-$TIMESTAMP-$$"
 
 echo "Installing Copilot review team into: $COPILOT_DIR"
+
+if ! command -v copilot >/dev/null 2>&1; then
+  echo "  WARNING: 'copilot' CLI not found on PATH. Files will still be installed, but"
+  echo "           you'll need GitHub Copilot CLI to use them. See:"
+  echo "           https://github.com/github/copilot-cli"
+fi
 
 mkdir -p "$AGENTS_DIR"
 
@@ -53,4 +61,7 @@ if [ -d "$BACKUP_DIR" ]; then
   echo "Backed up replaced files to: $BACKUP_DIR"
 fi
 
+echo "Installed agents:"
+ls "$AGENTS_DIR"/local-*.agent.md 2>/dev/null | sed 's#.*/#  #'
+echo "Verify anytime with: ls ~/.copilot/agents/local-*.agent.md"
 echo "Done. Start a new 'copilot' session for the team to take effect."

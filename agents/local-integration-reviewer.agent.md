@@ -4,7 +4,6 @@ description: "Large-context integration review: cross-module consistency, ripple
 model: gemini-3.1-pro-preview
 tools:
   - read
-  - edit
   - search
   - shell
 ---

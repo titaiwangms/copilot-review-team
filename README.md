@@ -25,8 +25,8 @@ agents/                       9 sub-agent definitions
   local-developer.agent.md          Implements code + tests from the design
   local-readability-reviewer.agent.md  Naming, clarity, organization, docs
   local-code-reviewer.agent.md      Correctness, idiom, patterns, test quality
-  local-critical-reviewer.agent.md  Adversarial: bugs, security, perf, edge cases
-  local-deep-reviewer.agent.md      Spec adherence, math, multi-file invariants
+  local-critical-reviewer.agent.md  Adversarial: security, perf, failure modes, structural design
+  local-deep-reviewer.agent.md      Spec/math arbiter: multi-file invariants, tie-breaker when reviewers disagree
   local-integration-reviewer.agent.md  Cross-module / whole-codebase consistency
   local-qa-tester.agent.md          Actually runs the code, reports repro steps
   local-tech-writer.agent.md        Docs, examples, READMEs, changelogs
@@ -38,10 +38,25 @@ install.sh                    Copies everything into ~/.copilot/
 > `copilot-instructions.md` is what tells the lead agent *when* and *how* to fan
 > them out. Installing only the agents won't reproduce the workflow.
 
+The `local-` prefix is just a namespace convention to mark these as user-installed
+agents. The installer only copies `local-*.agent.md` files, so any custom agent you
+add must follow that naming to be picked up.
+
+## Prerequisites
+
+- **GitHub Copilot CLI** installed and working — see
+  [github/copilot-cli](https://github.com/github/copilot-cli) for install instructions
+  (typically `npm install -g @github/copilot`, then run `copilot`).
+- A Copilot plan whose account can access multiple model families (Claude / GPT /
+  Gemini). If yours can't, you'll swap the model IDs — see
+  [Model diversity](#model-diversity--why-it-matters-and-what-breaks-if-you-change-it).
+- To see which model IDs your account can use, run `/model` inside a `copilot` session
+  (or check your Copilot settings), then match the agent `model:` fields to that list.
+
 ## Install
 
 ```bash
-git clone <this-repo-url> copilot-review-team
+git clone https://github.com/titaiwangms/copilot-review-team
 cd copilot-review-team
 ./install.sh
 ```
@@ -50,17 +65,30 @@ Then start a fresh `copilot` session. The lead agent will pick up the team
 automatically.
 
 `install.sh` backs up any existing `~/.copilot/copilot-instructions.md` and
-matching agent files to `~/.copilot/.backup-<timestamp>/` before overwriting, so
+matching agent files to `~/.copilot/.backup-<timestamp>-<pid>/` before overwriting, so
 it's safe to re-run.
+
+## Try this first
+
+After installing, open a `copilot` session in any git repo and ask for something small:
+
+> "Add input validation to function `foo` in `src/…` and write a test for it."
+
+You should see the lead agent classify the task, delegate to `local-developer`, then
+fan out a reviewer or two plus `local-qa-tester`, and summarize what it found. For a
+bigger ask ("refactor module X to support Y") it runs the full pipeline, starting with
+an architect design doc it shows you for approval. If you're not sure it loaded, ask:
+*"what agents do you have?"*
 
 ### Already have a `copilot-instructions.md`?
 
-The installer replaces it (after backing it up). If you have your own global
-instructions you want to keep, open the backup and **merge** the
-"Multi-agent team playbook" section into your file by hand rather than letting it
-be replaced wholesale.
+The installer replaces it (after backing it up). To keep your own instructions, open the
+backup at `~/.copilot/.backup-<timestamp>-<pid>/copilot-instructions.md`, copy everything
+from the `# Multi-agent team playbook` heading to the end of this repo's
+`copilot-instructions.md`, and paste it into your file (top or bottom — the lead reads
+the whole file; order matters only if sections directly conflict).
 
-## Model diversity (the secret sauce — change carefully)
+## Model diversity — why it matters and what breaks if you change it
 
 The reviewers are spread across **three model families on purpose**:
 
@@ -106,7 +134,17 @@ instructions layer on top of (and win over) your global ones.
 
 ## Notes
 
-- These are plain Copilot CLI custom agents — no servers, no external services.
+- **No extra servers, but your code does go to model providers.** This repo adds no
+  server or external service of its own — but the workflow is built on Copilot CLI, which
+  sends your prompts, diffs, and code context to hosted model providers per your Copilot
+  plan. A full review fan-out sends the same diff to several model families. Don't treat
+  it as an air-gapped/local-only setup; for sensitive code, narrow the pipeline (e.g.
+  fewer reviewers) accordingly.
+- **Cost & latency scale with the pipeline.** A non-trivial task can fan out to architect
+  + developer + 5 reviewers + QA, possibly a second loop, then docs — i.e. many premium
+  model calls per change, multiplied by diff size. The "match depth to task size" guidance
+  in the playbook keeps this in check; lean on *"just do it"* / *"skip the team"* for small
+  work.
 - Tested with Copilot CLI. Requires an account with access to the referenced
   models (swap as needed).
 
