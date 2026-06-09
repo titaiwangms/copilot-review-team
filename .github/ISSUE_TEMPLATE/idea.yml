@@ -1,0 +1,23 @@
+name: Idea / suggestion
+description: A new agent, a pipeline tweak, a model swap, a docs improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas very welcome. Reminder: forking and changing it yourself is always
+        a valid option too — you don't need this to be merged to use it.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What's the idea?
+      description: What would you change or add, and why is it better?
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Trade-offs / things to watch
+      description: |
+        Anything this might break? (e.g. model-family diversity, install behavior,
+        extra setup burden)

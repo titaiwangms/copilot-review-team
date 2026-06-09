@@ -1,0 +1,43 @@
+name: Bug / problem
+description: Something doesn't work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! This is a personal setup shared as-is, so no
+        pressure on formatting — just give me enough to reproduce.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+  - type: input
+    id: copilot-version
+    attributes:
+      label: Copilot CLI version
+      placeholder: "e.g. 1.0.60"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - install.sh
+        - An agent prompt (local-*)
+        - The playbook (copilot-instructions.md)
+        - Docs / README
+        - Not sure
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+  - type: input
+    id: models
+    attributes:
+      label: Models involved (if relevant)
+      description: e.g. a model ID that's no longer available to your account

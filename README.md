@@ -11,6 +11,12 @@ The result: code changes get designed up front, implemented, then reviewed in
 parallel for correctness, security, edge cases, spec adherence, cross-module
 integration, and readability — before they ever reach you.
 
+> **Disclaimer.** This is a personal setup I happen to find useful, shared as-is —
+> not an official product, a standard, or a guarantee of anything. Treat it as a
+> starting template: **fork it, swap the models, rewrite the playbook, throw out
+> the parts you don't like.** Feedback and PRs are welcome (see
+> [CONTRIBUTING.md](CONTRIBUTING.md)), but you owe me nothing for using it. 🙂
+
 ## What's in here
 
 ```
