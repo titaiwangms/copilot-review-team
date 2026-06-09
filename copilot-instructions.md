@@ -43,7 +43,7 @@ Don't run the full team for every task — match the pipeline to the work:
 | Trivial (typo, one-line, doc-only) | Just do it yourself; no team |
 | Small (one file, <50 lines, well-defined) | Skip architect; delegate to developer + 1 reviewer (code-reviewer) + qa-tester |
 | Medium (a few files, clear scope) | Skip architect if scope is obvious; full review fan-out |
-| Non-trivial (multi-file, architectural, ambiguous) | Full pipeline below |
+| Non-trivial (multi-file, architectural, ambiguous implementation) | Full pipeline below |
 
 When uncertain, ask the architect first — its triviality check (`SKIP_ARCHITECT` response) tells you whether to expand or contract.
 
@@ -69,8 +69,10 @@ When uncertain, ask the architect first — its triviality check (`SKIP_ARCHITEC
    **Pass the diff inline in each prompt** (`git diff` output or a summary of changed
    files with line numbers). Don't make each reviewer fetch it independently — wastes
    tool calls and context. Each reviewer gets the same diff plus role-specific framing.
-6. **Synthesize.** Aggregate findings across all reviewers. Deduplicate. Prioritize by
-   severity (Critical → Major → Minor → Nit). Drop nits unless the user wants thoroughness.
+6. **Synthesize findings.** Aggregate findings across all reviewers. Deduplicate. Prioritize by
+   severity (Critical → Major → Minor → Nit). Normalize severities first: map qa-tester's
+   P0/P1/P2/P3 to Critical/Major/Minor/Nit, and treat a deep-reviewer **Question** as a Minor
+   carrying an open question. Drop nits unless the user wants thoroughness.
    **Filter to in-scope findings only** — out-of-scope improvements (refactors, unrelated
    bugs reviewers spotted) get listed as "follow-up suggestions" in the final summary,
    not sent back to the developer.
@@ -91,7 +93,7 @@ For pipelines expected to take more than ~2 minutes of wall time (full team, mul
 tasks), post a brief status line to the user before each phase:
 
 > "Architect done. Starting developer."
-> "Developer done. Fanning out 5 reviewers in parallel."
+> "Developer done. Fanning out 5 reviewers + QA in parallel."
 > "Review synthesis: 2 Major, 1 Minor. Loop 1/2 starting."
 
 Skip status updates for short pipelines — they add noise.
@@ -125,8 +127,8 @@ it wasn't.
 
 - **One delegation per role per phase.** Don't spawn the same role twice in parallel
   unless work is genuinely independent and decomposable.
-- **Parallelize the review phase.** All five reviewers should run in a single turn,
-  not sequentially. Same for QA + reviewers when they look at the same code.
+- **Parallelize the review phase.** All five reviewers and qa-tester should run in a single
+  parallel turn, not sequentially.
 - **Pass complete context.** Each delegation gets a self-contained prompt: the task,
   any prior design doc, the diff or files to review, and what you specifically want
   back. Sub-agents don't share your conversation — they need everything explicit.
@@ -166,6 +168,8 @@ The team is intentionally split across model families:
   set neither Claude nor GPT shares; its large context window makes it the natural fit
   for wide cross-module/whole-codebase consistency review)
 - Tech Writer is GPT-5.5 (prose; either family works)
+- QA Tester is Claude sonnet (it runs the code and reports failures — execution and repro,
+  not adversarial reading, so model family isn't critical for this role)
 
 If you change a model, preserve the cross-family pattern between developer and the
 adversarial reviewers — that's the main source of review value.

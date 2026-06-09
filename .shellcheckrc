@@ -1,0 +1,7 @@
+# shellcheck configuration for this repo.
+#
+# SC2012: "Use find instead of ls". We intentionally use `ls` on globs of
+# files we control (agent definitions, our own timestamped .backup-* dirs),
+# where the filenames are known-simple and the lexical sort order is exactly
+# what we want. `find` would be more ceremony for no benefit here.
+disable=SC2012

@@ -1,10 +1,12 @@
 # Copilot CLI Review Team
 
+[![validate](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml/badge.svg)](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml)
+
 A drop-in **multi-agent review team** for [GitHub Copilot CLI](https://github.com/github/copilot-cli).
 
 Instead of one model doing everything, this setup gives the lead Copilot agent a
-team of specialized sub-agents — an architect, a developer, five reviewers (each on
-a deliberately different model family), a QA tester, and a tech writer — and a
+team of specialized sub-agents — an architect, a developer, five reviewers (spread across
+three model families — Claude, GPT, and Gemini), a QA tester, and a tech writer — and a
 **playbook** that wires them into a design → build → review → fix pipeline.
 
 The result: code changes get designed up front, implemented, then reviewed in
@@ -31,7 +33,12 @@ agents/                       9 sub-agent definitions
   local-qa-tester.agent.md          Actually runs the code, reports repro steps
   local-tech-writer.agent.md        Docs, examples, READMEs, changelogs
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
+models.conf                   Agent → model mapping (the knob you edit to swap models)
+set-models.sh                 Applies models.conf to the agents + playbook table
 install.sh                    Copies everything into ~/.copilot/
+uninstall.sh                  Removes this repo's agents from ~/.copilot/ (leaves others alone)
+scripts/validate.sh           Repo self-checks (run before submitting a PR; also runs in CI)
+examples/                     Illustrative design-doc + review-synthesis samples
 ```
 
 > **Both pieces are required.** The agents are inert without the playbook —
@@ -68,6 +75,9 @@ automatically.
 matching agent files to `~/.copilot/.backup-<timestamp>-<pid>/` before overwriting, so
 it's safe to re-run.
 
+`install.sh` and `uninstall.sh` honor a `$COPILOT_HOME` environment variable if your
+Copilot CLI keeps its config somewhere other than the default `~/.copilot`.
+
 ## Try this first
 
 After installing, open a `copilot` session in any git repo and ask for something small:
@@ -79,6 +89,10 @@ fan out a reviewer or two plus `local-qa-tester`, and summarize what it found. F
 bigger ask ("refactor module X to support Y") it runs the full pipeline, starting with
 an architect design doc it shows you for approval. If you're not sure it loaded, ask:
 *"what agents do you have?"*
+
+For a sense of what the team's artifacts look like before you run it, see
+[`examples/`](examples/) — a sample architect design doc and the matching review
+synthesis for one small change (illustrative, not actual run output).
 
 ### Already have a `copilot-instructions.md`?
 
@@ -108,6 +122,28 @@ The exact model IDs live in each `agents/local-*.agent.md` and in the table in
 `copilot-instructions.md`. Adjust them to whatever your Copilot CLI account has
 access to — if a referenced model isn't available to you, point that agent at one
 that is.
+
+### Customizing models
+
+Don't hand-edit the model IDs in nine agent files and the playbook table
+separately — they have to stay in sync. Instead, edit the single mapping in
+[`models.conf`](models.conf) and let the tooling apply it everywhere:
+
+```bash
+$EDITOR models.conf        # change the model IDs you want
+./set-models.sh --dry-run  # preview the exact edits (writes nothing)
+./set-models.sh            # apply to agent frontmatter + the playbook table
+./install.sh               # copy the updated files into ~/.copilot/
+```
+
+`./set-models.sh --check` verifies the agent frontmatter and the playbook table
+agree (this is what CI runs); it exits nonzero on drift. The prettified family
+names in the prose (e.g. "Claude Opus 4.8") are a manual concern — the tool only
+touches the machine-readable model IDs.
+
+To remove the team later, run [`./uninstall.sh`](uninstall.sh) — it removes only
+the agent files this repo installed (your other `local-*` agents are left alone)
+and restores your previous `copilot-instructions.md` from the install backup.
 
 ## How it behaves
 
