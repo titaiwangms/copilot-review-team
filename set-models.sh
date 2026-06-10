@@ -19,7 +19,6 @@
 #   -h, --help    show this help
 #
 # Dependencies: bash + python3 only (no PyYAML).
-#
 # --- end usage ---
 
 set -euo pipefail
