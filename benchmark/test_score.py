@@ -111,6 +111,12 @@ class FalsePositiveDetectionTests(unittest.TestCase):
         review = "This is a **critical** bug in otherwise clean code."
         self.assertEqual(len(score.find_false_positive_findings(review)), 1)
 
+    def test_negated_inline_bolded_severity_is_not_flagged(self):
+        # A clean reviewer dismissing severity must NOT accrue a phantom FP —
+        # critical once the exit gate fails on false positives.
+        self.assertEqual(score.find_false_positive_findings("No **critical** issues found"), [])
+        self.assertEqual(score.find_false_positive_findings("There are no **major** problems here."), [])
+
     def test_no_issues_prose_is_not_flagged(self):
         review = "No major issues found. The code looks correct and well tested."
         self.assertEqual(score.find_false_positive_findings(review), [])

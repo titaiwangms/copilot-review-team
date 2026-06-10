@@ -183,14 +183,21 @@ def defect_is_caught(defect, review_text, fixture_id=""):
 def find_false_positive_findings(review_text):
     """Return the reviewer lines that look like Major/Critical findings.
 
-    Used only on a clean control. This is a transparent heuristic, not ground
-    truth: it surfaces the offending lines (line-leading severity labels incl.
-    markdown headings, plus inline **emphasized** ones) so a human can confirm
-    them. See the benchmark README's "Known limitations" section.
+    Used only on a control. This is a transparent heuristic, not ground truth: it
+    surfaces lines that ASSERT a Major/Critical finding (line-leading severity
+    labels incl. markdown headings, plus inline **emphasized** ones) so a human can
+    confirm them. An inline severity label in a NON-negated context counts; a
+    negated dismissal ("No **critical** issues found") does not — it reuses the
+    same negation guard as the catch side, so a clean reviewer is not penalized for
+    saying a defect is absent. See the benchmark README's "Known limitations".
     """
     matches = []
     for line in review_text.splitlines():
-        if FALSE_POSITIVE_SEVERITY_RE.match(line) or _INLINE_FALSE_POSITIVE_RE.search(line):
+        if FALSE_POSITIVE_SEVERITY_RE.match(line):
+            matches.append(line.strip())
+            continue
+        inline = _INLINE_FALSE_POSITIVE_RE.search(line)
+        if inline and not _is_negated(line.lower(), inline.start()):
             matches.append(line.strip())
     return matches
 

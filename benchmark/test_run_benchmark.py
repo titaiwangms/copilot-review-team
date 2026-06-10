@@ -190,6 +190,27 @@ class MainExitCodeTests(unittest.TestCase):
         self.assertIn("catch-rate      : 100%", out)
         self.assertNotIn("false positives : 0", out)
 
+    def test_clean_reviewer_with_bolded_negated_dismissal_exits_zero(self):
+        # All defects caught; controls carry a bolded NEGATED dismissal
+        # ("No **critical** issues"). The negation-aware FP detector must not turn
+        # that into a phantom FP that falsely fails the precision-aware gate.
+        fixtures = [run_benchmark.score.load_fixture(d) for d in run_benchmark.discover_fixtures()]
+        with tempfile.TemporaryDirectory() as tmp:
+            for fixture in fixtures:
+                if fixture["defects"]:
+                    body = "\n".join(
+                        "- **%s**: in %s — %s"
+                        % (defect["severity"], " ".join(defect["location_tokens"]), defect["description"])
+                        for defect in fixture["defects"]
+                    )
+                else:
+                    body = "No **critical** issues found; this change looks correct."
+                with open(os.path.join(tmp, fixture["id"] + ".md"), "w") as handle:
+                    handle.write(body)
+            code, out = self._run(tmp)
+        self.assertEqual(code, 0, out)
+        self.assertIn("false positives : 0", out)
+
     def test_invalid_config_exits_one(self):
         code = run_benchmark.main(["--config", "bogus-no-equals"])
         self.assertEqual(code, 1)
