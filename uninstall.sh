@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# uninstall.sh — remove the Copilot review team that install.sh placed in
+# uninstall.sh — remove the Copilot Review + Build Team that install.sh placed in
 # ~/.copilot/.
 #
 # Safety: this removes ONLY explicit agent basenames — the union of this repo's
@@ -69,7 +69,7 @@ run() {
   fi
 }
 
-echo "Uninstalling Copilot review team from: $COPILOT_DIR"
+echo "Uninstalling Copilot Review + Build Team from: $COPILOT_DIR"
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "(dry-run — no changes will be made)"
 fi
