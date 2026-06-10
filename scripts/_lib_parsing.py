@@ -148,6 +148,9 @@ def load_overrides(path):
     overrides = {}
     with open(path, encoding="utf-8") as handle:
         for lineno, raw in enumerate(handle, 1):
+            # '#' can never appear in a valid agent/model token (see AGENT_RE/
+            # MODEL_RE), so the first '#' always begins a comment — splitting
+            # here strips inline and full-line comments losslessly.
             line = raw.split("#", 1)[0].strip()
             if not line:
                 continue
