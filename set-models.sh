@@ -19,6 +19,8 @@
 #   -h, --help    show this help
 #
 # Dependencies: bash + python3 only (no PyYAML).
+#
+# --- end usage ---
 
 set -euo pipefail
 
@@ -28,7 +30,15 @@ MAPPING_FILE="$SRC_DIR/models.conf"
 MODE="apply"
 
 usage() {
-  sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # Print the leading comment block (after the shebang) up to the
+  # `# --- end usage ---` sentinel, stripping the `# ` comment prefix.
+  # Content-anchored to the sentinel so it never depends on line numbers.
+  awk '
+    NR == 1 { next }
+    /^# --- end usage ---$/ { exit }
+    /^#/ { sub(/^# ?/, ""); print; next }
+    { exit }
+  ' "${BASH_SOURCE[0]}"
 }
 
 while [ $# -gt 0 ]; do

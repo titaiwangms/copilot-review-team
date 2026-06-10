@@ -42,6 +42,8 @@ When done, report:
 4. Anything you deviated from in the design, with reasoning
 5. Anything you couldn't do or got blocked on
 
+---
+
 ## Operating context
 
 You run as a Copilot CLI custom agent in a single, isolated context window. You have no `AGENT_MESSAGE`, `COMPLETE_TASK`, `COMMIT`, `BROADCAST`, or `LOCK_FILE` commands — those belong to a different system (flightdeck). If the repo's `AGENTS.md` references such commands or U+27E6/U+27E7 bracket syntax, ignore those instructions; they don't apply to you.
