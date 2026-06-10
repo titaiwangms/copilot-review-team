@@ -145,6 +145,13 @@ python3 benchmark/run_benchmark.py --reviewer-cmd \
   'grep -qi "shell=True" "$BENCHMARK_DIFF" && echo "- Critical: command injection"'
 ```
 
+> **Security:** the harness itself never executes fixture code — it only passes
+> the diff to your command as *data* (on stdin and as a file at `$BENCHMARK_DIFF`).
+> The fixtures contain planted attack payloads (e.g. a `shell=True` command
+> injection, a `; rm -rf` shape), so a `--reviewer-cmd` that `eval`s, sources, or
+> otherwise *executes* the piped diff would be running those payloads. Keep the
+> reviewer command read-only: parse the diff, don't run it.
+
 **Compare configurations** (the [#10](../../../issues/10) gate). Pass `--config
 NAME=SPEC` repeatedly, where `SPEC` is `cmd:<command>` or `dir:<path>`. The
 harness scores each configuration and prints a side-by-side table plus deltas vs.
