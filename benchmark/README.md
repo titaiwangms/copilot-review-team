@@ -1,15 +1,19 @@
 # Catch-rate benchmark (proof of concept)
 
-**Status: proof-of-concept gate.** This benchmark answers the question the rest of
+**Status: proof of concept.** This benchmark answers the question the rest of
 the repo's CI never asks: *does the review team actually catch defects?*
 
 The repo's `scripts/validate.sh` checks **tidiness** — frontmatter shape, model
 sync, reviewer-count phrasing, shell syntax. None of those checks tell you whether
 the reviewers would flag a real bug. "Best review team" is therefore unfalsifiable.
 This benchmark makes it falsifiable on a small, labeled corpus, so we can decide
-whether a fully trusted version is worth building before investing in it (and
-before acting on [#10](../../../issues/10), collapsing 9 agents → 5, which this POC
-gates: don't cut a reviewer until you can measure what cutting it costs).
+whether a fully trusted version is worth building before investing in it. It is
+**directly relevant** to [#10](../../../issues/10) (collapsing 9 agents → 5): it
+provides the measurement primitive — and a config-comparison mode — for asking
+"what does cutting a reviewer cost?". It does **not** by itself gate that decision:
+a defensible gate needs the trusted, larger, balanced corpus described under
+[Known limitations](#known-limitations-this-is-a-poc-not-ground-truth). Treat the
+numbers as evidence to inform #10, not as an automated gate.
 
 ## What it measures
 
@@ -152,11 +156,12 @@ python3 benchmark/run_benchmark.py --reviewer-cmd \
 > otherwise *executes* the piped diff would be running those payloads. Keep the
 > reviewer command read-only: parse the diff, don't run it.
 
-**Compare configurations** (the [#10](../../../issues/10) gate). Pass `--config
-NAME=SPEC` repeatedly, where `SPEC` is `cmd:<command>` or `dir:<path>`. The
-harness scores each configuration and prints a side-by-side table plus deltas vs.
-the first one — so "what does cutting a reviewer cost?" becomes a measured number,
-not a guess:
+**Compare configurations** (the measurement primitive relevant to
+[#10](../../../issues/10) — see the status note: this informs the decision, it
+does not automate it). Pass `--config NAME=SPEC` repeatedly, where `SPEC` is
+`cmd:<command>` or `dir:<path>`. The harness scores each configuration and prints
+a side-by-side table plus deltas vs. the first one — so "what does cutting a
+reviewer cost?" becomes a measured number, not a guess:
 
 ```bash
 python3 benchmark/run_benchmark.py \
