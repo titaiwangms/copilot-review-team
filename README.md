@@ -1,17 +1,23 @@
-# Copilot CLI Review Team
+# Copilot CLI Review + Build Team
 
 [![validate](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml/badge.svg)](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml)
 
-A drop-in **multi-agent review team** for [GitHub Copilot CLI](https://github.com/github/copilot-cli).
+A drop-in **multi-agent SDLC team** for [GitHub Copilot CLI](https://github.com/github/copilot-cli):
+it **designs, builds, reviews, and fixes** code, end to end.
 
 Instead of one model doing everything, this setup gives the lead Copilot agent a
-team of specialized sub-agents — an architect, a developer, five reviewers (spread across
-three model families — Claude, GPT, and Gemini), a QA tester, and a tech writer — and a
-**playbook** that wires them into a design → build → review → fix pipeline.
+team of specialized sub-agents — an architect and a developer that **build**, five reviewers
+(spread across three model families — Claude, GPT, and Gemini) plus a QA tester that
+**review**, and a tech writer that documents — wired together by a **playbook** into a
+design → build → review → fix pipeline.
 
 The result: code changes get designed up front, implemented, then reviewed in
 parallel for correctness, security, edge cases, spec adherence, cross-module
-integration, and readability — before they ever reach you.
+integration, and readability — and looped back for fixes — before they ever reach you.
+
+Want just a review pass? Ask it to **"review &lt;PR&gt;"** and it runs the reviewers only,
+without touching code. **Build and review are two first-class halves of one team** — use
+the whole pipeline or either half on its own.
 
 > **Disclaimer.** This is a personal setup I happen to find useful, shared as-is —
 > not an official product, a standard, or a guarantee of anything. Treat it as a
@@ -41,9 +47,13 @@ scripts/validate.sh           Repo self-checks (run before submitting a PR; also
 examples/                     Illustrative design-doc + review-synthesis samples
 ```
 
-> **Both pieces are required.** The agents are inert without the playbook —
-> `copilot-instructions.md` is what tells the lead agent *when* and *how* to fan
-> them out. Installing only the agents won't reproduce the workflow.
+> **One install, two jobs.** This team both **builds** (architect → developer → tech
+> writer) and **reviews** (five reviewers + QA tester) — two first-class halves of one
+> design → build → review → fix loop, not a review tool with build bolted on. The agent
+> files and the `copilot-instructions.md` playbook ship together: the agents define *who*
+> is on the team, the playbook tells the lead agent *when* and *how* to fan them out. Install
+> both for the full workflow; you can still invoke just the review half (see
+> ["How it behaves"](#how-it-behaves)).
 
 The `local-` prefix is just a namespace convention to mark these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you
@@ -189,6 +199,28 @@ instructions layer on top of (and win over) your global ones.
   work.
 - Tested with Copilot CLI. Requires an account with access to the referenced
   models (swap as needed).
+
+## Known limitations
+
+Documented, accepted trade-offs for the single-user install this tool targets — not open
+action items. See the linked issues for detail.
+
+- **`install.sh` backup→remove is not atomic (TOCTOU).**
+  ([#4](https://github.com/titaiwangms/copilot-review-team/issues/4)) When replacing a
+  symlink or pruning an orphaned agent, the installer backs the file up and then removes
+  it as two separate steps. A process racing in between could leave the removed bytes
+  differing from the backed-up bytes. The window is theoretical under the intended
+  single-user use — the installer isn't meant to run concurrently with itself — and is
+  empirically safe in testing. A `flock` lockfile under `$COPILOT_DIR` would close it if
+  multi-user installs ever become a use case.
+- **Install manifest is trusted by name.**
+  ([#5](https://github.com/titaiwangms/copilot-review-team/issues/5)) Upgrades prune
+  agents recorded in `~/.copilot/.copilot-review-team-manifest`. Path-traversal names are
+  already rejected, but a *validly-named* foreign agent hand-injected into the manifest
+  would be pruned on the next upgrade. This requires the user to tamper with their own
+  manifest, so the practical risk is near-zero. Recording per-agent ownership (a content
+  hash and/or installer marker) and only pruning entries this installer actually wrote
+  would harden it.
 
 ## License
 
