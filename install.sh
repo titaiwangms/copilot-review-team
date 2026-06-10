@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Installs the Copilot CLI review team into ~/.copilot/
+# Installs the Copilot CLI Review + Build Team into ~/.copilot/
 #
 #   - Copies the local-* agent definitions into ~/.copilot/agents/
 #   - Installs the orchestration playbook as ~/.copilot/copilot-instructions.md
@@ -58,7 +58,7 @@ if [ -e "$MANIFEST" ]; then
   done < <(grep '^AGENT=' "$MANIFEST" 2>/dev/null | cut -d= -f2- || true)
 fi
 
-echo "Installing Copilot review team into: $COPILOT_DIR"
+echo "Installing Copilot Review + Build Team into: $COPILOT_DIR"
 
 if ! command -v copilot >/dev/null 2>&1; then
   echo "  WARNING: 'copilot' CLI not found on PATH. Files will still be installed, but"

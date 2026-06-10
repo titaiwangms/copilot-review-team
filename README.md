@@ -16,8 +16,8 @@ parallel for correctness, security, edge cases, spec adherence, cross-module
 integration, and readability — and looped back for fixes — before they ever reach you.
 
 Want just a review pass? Ask it to **"review &lt;PR&gt;"** and it runs the reviewers only,
-without touching code. **Build and review are two first-class halves of one team** — use
-the whole pipeline or either half on its own.
+without touching code (the QA tester, which *executes* code, sits out). **Build and review
+are two first-class halves of one team** — use the whole pipeline or either half on its own.
 
 > **Disclaimer.** This is a personal setup I happen to find useful, shared as-is —
 > not an official product, a standard, or a guarantee of anything. Treat it as a
@@ -176,6 +176,8 @@ You can always override: say *"just do it"*, *"skip the team"*, or
 
 For PR reviews, ask the lead to **"review &lt;PR url&gt;"** and it runs a review-only
 pipeline (five reviewers in parallel, synthesized by severity) without touching code.
+The QA tester is deliberately excluded from this pass — it verifies behavior by *running*
+your code, which a review-only pass (static review, no execution) does not do.
 
 ## Per-repo install (optional)
 
@@ -205,7 +207,7 @@ instructions layer on top of (and win over) your global ones.
 Documented, accepted trade-offs for the single-user install this tool targets — not open
 action items. See the linked issues for detail.
 
-- **`install.sh` backup→remove is not atomic (TOCTOU).**
+- **`install.sh` backup→remove is not atomic (a TOCTOU-style race).**
   ([#4](https://github.com/titaiwangms/copilot-review-team/issues/4)) When replacing a
   symlink or pruning an orphaned agent, the installer backs the file up and then removes
   it as two separate steps. A process racing in between could leave the removed bytes
@@ -218,9 +220,11 @@ action items. See the linked issues for detail.
   agents recorded in `~/.copilot/.copilot-review-team-manifest`. Path-traversal names are
   already rejected, but a *validly-named* foreign agent hand-injected into the manifest
   would be pruned on the next upgrade. This requires the user to tamper with their own
-  manifest, so the practical risk is near-zero. Recording per-agent ownership (a content
-  hash and/or installer marker) and only pruning entries this installer actually wrote
-  would harden it.
+  manifest, so the practical risk is near-zero. The prune is also reversible: agents are
+  `backup()`'d to `~/.copilot/.backup-<timestamp>-<pid>/` before removal, so an erroneous
+  prune can be restored rather than lost. Recording per-agent ownership (a content hash
+  and/or installer marker) and only pruning entries this installer actually wrote would
+  harden it further.
 
 ## License
 
