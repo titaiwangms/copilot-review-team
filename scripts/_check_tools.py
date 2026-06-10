@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""C7: least-privilege tool grants in agent frontmatter.
+"""C6: least-privilege tool grants in agent frontmatter.
 
 Reads each agents/local-*.agent.md frontmatter `tools:` list (via the shared
 parser in _lib_parsing) and asserts the team's privilege invariants:

@@ -25,7 +25,7 @@ anything.
 - **Preserve the cross-family model split.** The main value of the review phase is
   that reviewers run on *different model families* than the developer. If you
   change models, keep the developer and the adversarial reviewers in different
-  families (see the model table in the README / playbook). Each agent's model is
+  families (see the model-diversity notes in the README and playbook). Each agent's model is
   the `model:` line in its own `agents/local-*.agent.md` frontmatter — the single
   source of truth. Edit it there. To override models without touching the repo
   (e.g. in a fork), use `install.sh`'s optional override file

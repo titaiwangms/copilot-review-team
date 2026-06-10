@@ -9,7 +9,7 @@ agent frontmatter is a constrained, machine-written subset, so a tiny purpose
 Public API:
     parse_frontmatter(text)      -> (dict | None, end_index | None)
     parse_tools(text)            -> list[str] | None
-    frontmatter_model(path)      -> str            (raises on malformed input)
+    read_frontmatter_model(path) -> str            (raises on malformed input)
     set_frontmatter_model(text, model) -> str
     load_overrides(path)         -> dict           (agent -> model, '*' wildcard)
     resolve_model(overrides, agent) -> str | None
@@ -22,13 +22,27 @@ import re
 MODEL_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 AGENT_RE = re.compile(r"^local-[A-Za-z0-9-]+$")
 
-# Wildcard keys in an override file that mean "every agent not listed explicitly".
-WILDCARD_KEYS = ("*", "default")
+# Wildcard key in an override file that means "every agent not listed explicitly".
 WILDCARD = "*"
 
 
 class ParseError(Exception):
     """Raised for malformed input the caller should report and abort on."""
+
+
+def _frontmatter_bounds(lines):
+    """Return the line index of the closing '---' of a leading frontmatter block.
+
+    Returns None if `lines` does not open with '---' or has no closing '---'.
+    Works with lines from either splitlines() or splitlines(keepends=True),
+    since the comparison strips trailing whitespace/newlines.
+    """
+    if not lines or lines[0].strip() != "---":
+        return None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return i
+    return None
 
 
 def parse_frontmatter(text):
@@ -40,13 +54,7 @@ def parse_frontmatter(text):
     those). Returns (None, None) if there is no well-formed frontmatter block.
     """
     lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return None, None
-    end = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end = i
-            break
+    end = _frontmatter_bounds(lines)
     if end is None:
         return None, None
     frontmatter = {}
@@ -68,13 +76,7 @@ def parse_tools(text):
     if there is no well-formed frontmatter or no `tools:` key.
     """
     lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return None
-    end = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end = i
-            break
+    end = _frontmatter_bounds(lines)
     if end is None:
         return None
     for i in range(1, end):
@@ -93,8 +95,11 @@ def parse_tools(text):
     return None
 
 
-def frontmatter_model(path):
-    """Return the `model:` value from a file's frontmatter, or raise ParseError."""
+def read_frontmatter_model(path):
+    """Read a file and return the `model:` value from its frontmatter.
+
+    Does file I/O (the name signals this); raises ParseError on malformed input.
+    """
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
     frontmatter, _ = parse_frontmatter(text)
@@ -112,13 +117,7 @@ def set_frontmatter_model(text, model):
     no model: line within it.
     """
     lines = text.splitlines(keepends=True)
-    if not lines or lines[0].strip() != "---":
-        raise ParseError("malformed frontmatter")
-    end = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end = i
-            break
+    end = _frontmatter_bounds(lines)
     if end is None:
         raise ParseError("malformed frontmatter")
     for i in range(1, end):
@@ -138,9 +137,10 @@ def load_overrides(path):
     and/or a single '=', so both of these are valid:
         local-architect  gpt-5.4
         local-architect = gpt-5.4
-    A wildcard line ('*' or 'default') sets the model for every agent not named
-    explicitly, e.g. `*  gpt-5.4` pins the whole team to one model. Blank lines
-    and '#' comments are ignored. The wildcard is stored under the key '*'.
+    A wildcard line ('*') sets the model for every agent not named explicitly,
+    e.g. `*  gpt-5.4` pins the whole team to one model. Blank lines, full-line
+    '#' comments, and trailing inline '#' comments are ignored:
+        local-architect  gpt-5.4   # faster model for design
 
     Tokens are validated strictly so a bad value can never break an agent's
     frontmatter. Raises ParseError on any malformed line.
@@ -148,8 +148,8 @@ def load_overrides(path):
     overrides = {}
     with open(path, encoding="utf-8") as handle:
         for lineno, raw in enumerate(handle, 1):
-            line = raw.strip()
-            if not line or line.startswith("#"):
+            line = raw.split("#", 1)[0].strip()
+            if not line:
                 continue
             tokens = [t for t in re.split(r"[\s=]+", line) if t]
             if len(tokens) != 2:
@@ -158,9 +158,7 @@ def load_overrides(path):
                     % (lineno, path, raw.rstrip())
                 )
             agent, model = tokens
-            if agent in WILDCARD_KEYS:
-                agent = WILDCARD
-            elif not AGENT_RE.match(agent):
+            if agent != WILDCARD and not AGENT_RE.match(agent):
                 raise ParseError(
                     "invalid agent name %r on line %d of %s "
                     "(must match ^local-[A-Za-z0-9-]+$, or '*' for all)"

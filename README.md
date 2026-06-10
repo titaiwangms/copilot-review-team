@@ -173,11 +173,12 @@ EOF
 COPILOT_MODEL_OVERRIDE=/path/to/models.override ./install.sh
 ```
 
-An explicit per-agent entry wins over the `*` wildcard. A malformed override, or
-one that names an agent that doesn't exist, fails the install rather than
-silently doing nothing. The prettified family names in the prose (e.g. "Claude
-Opus 4.8") are a manual concern — overrides only touch the machine-readable
-`model:` line.
+An explicit per-agent entry wins over the `*` wildcard. Blank lines, full-line
+`#` comments, and trailing inline `#` comments (as shown above) are ignored. A
+malformed override, or one that names an agent that doesn't exist, fails the
+install rather than silently doing nothing. The prettified family names in the
+prose (e.g. "Claude Opus 4.8") are a manual concern — overrides only touch the
+machine-readable `model:` line.
 
 To remove the team later, run [`./uninstall.sh`](uninstall.sh) — it removes only
 the agent files this repo installed (your other `local-*` agents are left alone)
