@@ -1,0 +1,16 @@
+diff --git a/app/text.py b/app/text.py
+index ddddddd..eeeeeee 100644
+--- a/app/text.py
++++ b/app/text.py
+@@ -8,3 +8,12 @@ def slugify(title):
+     slug = re.sub(r"[^a-z0-9]+", "-", title.lower())
+     return slug.strip("-")
++
++
++def truncate(text, limit):
++    """Return `text` shortened to at most `limit` characters, with an ellipsis."""
++    if limit <= 0:
++        return ""
++    if len(text) <= limit:
++        return text
++    return text[: max(0, limit - 1)].rstrip() + "\u2026"

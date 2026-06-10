@@ -1,0 +1,16 @@
+diff --git a/app/backup.py b/app/backup.py
+index 3333333..4444444 100644
+--- a/app/backup.py
++++ b/app/backup.py
+@@ -1,5 +1,11 @@
+ import subprocess
+ 
+ 
++def archive_path(user_path):
++    # Build a tar archive of a user-supplied directory.
++    cmd = "tar -czf backup.tgz " + user_path
++    subprocess.run(cmd, shell=True)
++
++
+ def list_archives():
+     return subprocess.run(["ls", "backups/"], capture_output=True)

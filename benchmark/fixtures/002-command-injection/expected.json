@@ -1,0 +1,25 @@
+{
+  "id": "002-command-injection",
+  "title": "Command injection via shell=True with interpolated input",
+  "language": "python",
+  "defects": [
+    {
+      "id": "cmd-injection",
+      "category": "security",
+      "severity": "critical",
+      "location": "app/backup.py:archive_path",
+      "description": "`user_path` is interpolated into a shell string executed with shell=True, allowing arbitrary command injection (e.g. `; rm -rf /`). Should pass an argument list without shell=True.",
+      "match_any": [
+        "command injection",
+        "shell injection",
+        "shell=true",
+        "shell = true",
+        "arbitrary command",
+        "argument list",
+        "shlex",
+        "without a shell",
+        "injection"
+      ]
+    }
+  ]
+}

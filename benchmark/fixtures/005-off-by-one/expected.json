@@ -1,0 +1,28 @@
+{
+  "id": "005-off-by-one",
+  "title": "Off-by-one: sliding window overruns the list at the tail",
+  "language": "python",
+  "defects": [
+    {
+      "id": "off-by-one",
+      "category": "correctness",
+      "severity": "major",
+      "location": "app/window.py:moving_average",
+      "description": "The loop runs to len(values), so the final windows are shorter than `window` but the average still divides by `window`, producing wrong tail values. The range should stop at len(values) - window + 1.",
+      "match_any": [
+        "off-by-one",
+        "off by one",
+        "out of range",
+        "overrun",
+        "divides by window",
+        "divide by window",
+        "shorter than",
+        "last window",
+        "tail",
+        "len(values) - window",
+        "boundary",
+        "incorrect average"
+      ]
+    }
+  ]
+}

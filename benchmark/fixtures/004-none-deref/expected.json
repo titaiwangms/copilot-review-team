@@ -1,0 +1,26 @@
+{
+  "id": "004-none-deref",
+  "title": "Unchecked None return dereferenced (KeyError/None subscript)",
+  "language": "python",
+  "defects": [
+    {
+      "id": "none-deref",
+      "category": "correctness",
+      "severity": "major",
+      "location": "app/cart.py:cart_total",
+      "description": "`get_user` returns None when the user_id is absent (dict.get), but cart_total immediately subscripts `user[\"cart\"]`, raising TypeError on a missing user. Needs a None/missing check.",
+      "match_any": [
+        "none",
+        "null",
+        "typeerror",
+        "keyerror",
+        "missing user",
+        "not found",
+        "dict.get",
+        "could return none",
+        "may be none",
+        "guard"
+      ]
+    }
+  ]
+}
