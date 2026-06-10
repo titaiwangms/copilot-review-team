@@ -198,14 +198,15 @@ case "$mode" in
     fi
     tmp="$(mktemp)"
     generate > "$tmp"
-    if diff -u "$OUT" "$tmp" >/dev/null; then
-      rm -f "$tmp"
+    # Compute the diff once; empty means in sync.
+    diff_output="$(diff -u "$OUT" "$tmp" || true)"
+    rm -f "$tmp"
+    if [ -z "$diff_output" ]; then
       echo "Bundle is up to date: $OUT"
     else
       echo "Bundle is STALE. Regenerate with: scripts/build-bundle.sh" >&2
       echo "--- diff (committed vs freshly generated) ---" >&2
-      diff -u "$OUT" "$tmp" >&2 || true
-      rm -f "$tmp"
+      printf '%s\n' "$diff_output" >&2
       exit 1
     fi
     ;;
