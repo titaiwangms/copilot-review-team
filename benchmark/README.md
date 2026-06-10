@@ -224,9 +224,12 @@ five                 83% (5/6)        1        0
 ```
 
 Add `--json` for machine-readable output. **Exit code** (single configuration):
-`0` when every planted defect was caught, `2` when any defect was missed (so the
-benchmark can gate CI later), and `1` on a usage/corpus error. Comparison runs are
-informational and exit `0` unless the corpus itself fails to load.
+`0` only when every planted defect was caught **and** no false positive was raised
+on a control; `2` when any defect was missed **or** any control drew a
+Major/Critical false positive (so CI fails on both a reviewer that misses defects
+*and* a splatter reviewer that over-flags clean code); `1` on a usage/corpus
+error. Comparison runs are informational and exit `0` unless the corpus itself
+fails to load.
 
 ## Known limitations (this is a POC, not ground truth)
 
@@ -240,12 +243,16 @@ They are why this is gated as a proof of concept rather than wired into CI today
   still score as a miss, so the lists need human curation.
 - **Residual answer-key attack.** Requiring a located, specific phrase defeats a
   constant keyword blob (it can't cite per-fixture symbols) and the old
-  fixture-id leak. A determined attacker could still read every diff and assemble a
-  per-fixture key (correct symbol + phrase adjacency) — but that requires actually
-  reading the code, which is the behavior we want. Mitigations for a trusted
-  version: opaque/rotating fixture ids (the harness already withholds the id and
-  uses a random per-run token), a private held-out corpus, and periodic fixture
-  rotation.
+  fixture-id leak. Two residual attacks remain, each closed by a *different* guard:
+  (1) a **splatter** reviewer that emits located findings for every fixture
+  (including controls) needs no reading at all — it is caught purely by the
+  false-positive count on the controls, which is exactly why the single-config
+  exit gate fails on false positives, not just misses; (2) a **determined**
+  attacker could read every diff and assemble a per-fixture key (correct symbol +
+  phrase adjacency) — but that requires actually reading the code, which is the
+  behavior we want. Mitigations for a trusted version: opaque/rotating fixture ids
+  (the harness already withholds the id and uses a random per-run token), a private
+  held-out corpus, and periodic fixture rotation.
 - **False-positive scoring is heuristic.** A control flags lines that look like
   Major/Critical findings (line-leading or inline-bolded severity labels, incl.
   markdown headings); it surfaces the offending lines for human confirmation rather

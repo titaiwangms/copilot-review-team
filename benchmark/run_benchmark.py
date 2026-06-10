@@ -303,10 +303,13 @@ def main(argv=None):
     else:
         print_comparison([(name, summary, warnings) for name, summary, warnings, _ in config_summaries])
 
-    # Single-config gate: non-zero if any defect was missed, so a CI job can fail
-    # on regressions. Comparison runs are informational (exit 0 unless corpus error).
+    # Single-config gate: non-zero if any defect was MISSED (recall) or any
+    # false positive was raised on a control (precision), so a CI job fails on
+    # either a splatter reviewer that over-flags clean code or one that misses
+    # defects. Comparison runs are informational (exit 0 unless a corpus error).
     if len(config_summaries) == 1:
-        return 0 if config_summaries[0][1]["missed"] == 0 else 2
+        summary = config_summaries[0][1]
+        return 0 if (summary["missed"] == 0 and summary["false_positives"] == 0) else 2
     return 0
 
 

@@ -167,6 +167,29 @@ class MainExitCodeTests(unittest.TestCase):
             code, out = self._run(tmp)
         self.assertEqual(code, 2)
 
+    def test_false_positive_with_no_misses_exits_two(self):
+        # A splatter reviewer: catches every defect (recall 100%) but also raises a
+        # Major/Critical finding on the controls. Recall-only gating would pass it;
+        # the precision-aware gate must fail it (exit 2).
+        fixtures = [run_benchmark.score.load_fixture(d) for d in run_benchmark.discover_fixtures()]
+        with tempfile.TemporaryDirectory() as tmp:
+            for fixture in fixtures:
+                if fixture["defects"]:
+                    lines = [
+                        "- **%s**: in %s — %s"
+                        % (defect["severity"], " ".join(defect["location_tokens"]), defect["description"])
+                        for defect in fixture["defects"]
+                    ]
+                    body = "\n".join(lines)
+                else:  # control — splatter a false positive
+                    body = "- **Critical**: this clean control looks suspicious to me."
+                with open(os.path.join(tmp, fixture["id"] + ".md"), "w") as handle:
+                    handle.write(body)
+            code, out = self._run(tmp)
+        self.assertEqual(code, 2, out)
+        self.assertIn("catch-rate      : 100%", out)
+        self.assertNotIn("false positives : 0", out)
+
     def test_invalid_config_exits_one(self):
         code = run_benchmark.main(["--config", "bogus-no-equals"])
         self.assertEqual(code, 1)
