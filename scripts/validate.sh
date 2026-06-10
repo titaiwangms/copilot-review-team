@@ -162,9 +162,10 @@ fi
 
 # --- C9: zero-tooling bundle in sync ---
 # The committed paste-able bundle (dist/copilot-review-team-bundle.md) is a
-# generated artifact. It must be regenerated whenever an agent definition or the
-# playbook changes, or zero-tooling adopters get stale content. Enforce that the
-# committed bundle matches a fresh generation from the current sources.
+# generated artifact. It must be regenerated whenever an agent definition, the
+# playbook, or the VERSION file changes (the bundle embeds VERSION), or
+# zero-tooling adopters get stale content. Enforce that the committed bundle
+# matches a fresh generation from the current sources.
 echo "== C9: zero-tooling bundle drift =="
 # Capture output so a PASS stays quiet but a FAILURE shows WHAT drifted (the
 # generator prints a unified diff of committed-vs-fresh on stderr). Using

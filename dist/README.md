@@ -70,5 +70,5 @@ scripts/build-bundle.sh --stdout   # print without writing a file
 
 Generation is deterministic (sorted inputs, no timestamps). CI enforces sync via
 check **C9** in [`scripts/validate.sh`](../scripts/validate.sh): if you change an
-agent or the playbook, regenerate the bundle in the same commit or the check
-fails.
+agent, the playbook, or the `VERSION` file, regenerate the bundle in the same
+commit or the check fails.

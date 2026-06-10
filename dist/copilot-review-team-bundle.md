@@ -3,7 +3,8 @@
 > **Generated file — do not edit by hand.** Produced by
 > `scripts/build-bundle.sh` from the agent definitions and playbook in the
 > [copilot-review-team](https://github.com/titaiwangms/copilot-review-team)
-> repo. Re-run the generator after changing any agent or the playbook.
+> repo. Re-run the generator after changing any agent, the playbook, or the
+> VERSION file.
 
 **Bundle version:** 1.0.0
 
