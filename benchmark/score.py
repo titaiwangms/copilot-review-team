@@ -4,24 +4,89 @@
 This module is deliberately free of subprocess / CLI concerns so it can be unit
 tested in isolation. It answers one question: given a reviewer's plain-text
 output and a fixture's list of expected (planted) defects, which defects did the
-reviewer CATCH, which did it MISS, and — for the clean control — did it raise
+reviewer CATCH, which did it MISS, and — for a clean control — did it raise
 false-positive findings?
 
-A defect is considered "caught" when any of its `match_any` keywords appears
-(case-insensitively, as a substring) anywhere in the reviewer's output. Keyword
-matching is intentionally simple and transparent: the fixtures own the keyword
-lists, so tightening or loosening a match is a data edit, not a code change.
+Why a catch requires a LOCATED finding
+--------------------------------------
+A naive "does any keyword appear?" test is trivially gameable: a reviewer that
+emits a constant blob of defect keywords without reading the code would score a
+perfect catch-rate, defeating the whole point of the benchmark (make review
+quality *falsifiable*). So a defect is "caught" only when the review contains, in
+a single block (paragraph), ALL of:
+
+  1. one of the defect's specific `match_any` phrases (multi-word, defect-specific
+     — NOT bare nouns like "injection" that appear in unrelated prose), AND
+  2. that phrase in a NON-negated context (so "there is no SQL injection" does not
+     count as catching the SQL-injection defect), AND
+  3. a reference to the defect's `location` — one of `location_tokens` (the
+     function name or file) — within PROXIMITY_CHARS of the phrase.
+
+Requirement 3 is the key anti-gaming property: to ground a catch, the reviewer
+must cite the symbol/file from the diff it was handed, i.e. it must actually read
+the change. Citing `file:line` / the symbol is exactly what real reviewers (and
+this repo's reviewer agents) are instructed to do, so this rewards genuine
+findings and rejects keyword splatter. See benchmark/README.md.
+
+Keyword and location lists live in each fixture's `expected.json`, so tuning a
+match is a data edit, not a code change.
 """
 import json
 import os
 import re
 
+# How close (in characters, within one block) a location token must sit to a
+# matched phrase for the match to count as a grounded, located finding.
+PROXIMITY_CHARS = 160
+
+# Negation cues scanned in a short window immediately before a phrase match. If
+# present, the phrase is being dismissed ("no SQL injection here"), not reported.
+_NEGATION_RE = re.compile(
+    r"\b(no|not|never|without|isn't|aren't|wasn't|weren't|doesn't|don't|didn't|"
+    r"cannot|can't|free of|none of|no sign of|no risk of|rather than)\b|n't"
+)
+_NEGATION_WINDOW_CHARS = 30
+
 # A clean-control finding is treated as a false positive only when the reviewer
 # labels it at this severity or higher. Minor/Nit style suggestions on correct
-# code are expected and are NOT penalized.
+# code are expected and are NOT penalized. We match a severity label that opens a
+# line (optionally as a markdown heading, bullet, or numbered item) OR that is
+# emphasized inline (**Critical** / __Major__) anywhere in a line.
 FALSE_POSITIVE_SEVERITY_RE = re.compile(
-    r"(?im)^\s*(?:[-*+]\s*)?(?:\d+[.)]\s*)?(?:\*\*|__)?\s*(critical|major)\b"
+    r"(?im)^\s*#{0,6}\s*(?:[-*+]\s*)?(?:\d+[.)]\s*)?(?:\*\*|__)?\s*(critical|major)\b"
 )
+_INLINE_FALSE_POSITIVE_RE = re.compile(r"(?i)(?:\*\*|__)\s*(critical|major)\b")
+
+
+def _split_blocks(text):
+    """Split review text into blocks (paragraphs) on blank lines.
+
+    Grounding (phrase + location proximity) is evaluated within a single block so
+    a phrase reported for one finding cannot borrow a location mentioned in an
+    unrelated paragraph.
+    """
+    blocks = re.split(r"\n\s*\n", text)
+    return [block.strip() for block in blocks if block.strip()]
+
+
+def _is_negated(block, phrase_index):
+    """True if a negation cue sits just before the phrase at phrase_index."""
+    window = block[max(0, phrase_index - _NEGATION_WINDOW_CHARS):phrase_index]
+    return bool(_NEGATION_RE.search(window))
+
+
+def _is_grounded(block, phrase_index, phrase_length, location_tokens):
+    """True if a location token appears within PROXIMITY_CHARS of the phrase.
+
+    With no location_tokens (defensive — every shipped defect supplies them),
+    grounding is skipped and any phrase match grounds itself.
+    """
+    if not location_tokens:
+        return True
+    start = max(0, phrase_index - PROXIMITY_CHARS)
+    end = phrase_index + phrase_length + PROXIMITY_CHARS
+    window = block[start:end]
+    return any(token in window for token in location_tokens)
 
 
 def load_fixture(fixture_dir):
@@ -56,7 +121,8 @@ def load_fixture(fixture_dir):
 def _validate_fixture(meta):
     """Fail loudly on a malformed fixture so corpus mistakes surface early."""
     for defect in meta["defects"]:
-        missing = [k for k in ("id", "category", "severity", "match_any") if k not in defect]
+        required = ("id", "category", "severity", "match_any", "location_tokens")
+        missing = [key for key in required if key not in defect]
         if missing:
             raise ValueError(
                 "fixture %r defect %r missing keys: %s"
@@ -66,6 +132,11 @@ def _validate_fixture(meta):
             raise ValueError(
                 "fixture %r defect %r has an empty match_any list"
                 % (meta["id"], defect["id"])
+            )
+        if not defect["location_tokens"]:
+            raise ValueError(
+                "fixture %r defect %r has an empty location_tokens list; a catch "
+                "must be groundable to a location" % (meta["id"], defect["id"])
             )
 
 
@@ -86,28 +157,40 @@ def strip_fixture_id(review_text, fixture_id):
 
 
 def defect_is_caught(defect, review_text, fixture_id=""):
-    """Return the first keyword that matched, or None if the defect was missed.
+    """Return the first phrase that grounded a catch, or None if missed.
 
-    The fixture id is stripped from the review text first (see strip_fixture_id)
-    so an echoed id cannot produce a spurious catch.
+    A catch requires, within one block of the review: a specific `match_any`
+    phrase, in a non-negated context, with one of the defect's `location_tokens`
+    nearby (see this module's docstring and the helpers above). The fixture id is
+    stripped from the text first so an echoed id cannot fake a catch.
     """
-    haystack = strip_fixture_id(review_text, fixture_id) if fixture_id else review_text.lower()
-    for keyword in defect["match_any"]:
-        if keyword.lower() in haystack:
-            return keyword
+    text = strip_fixture_id(review_text, fixture_id) if fixture_id else review_text.lower()
+    location_tokens = [token.lower() for token in defect.get("location_tokens", [])]
+    phrases = [phrase.lower() for phrase in defect["match_any"]]
+
+    for block in _split_blocks(text):
+        for original_phrase, phrase in zip(defect["match_any"], phrases):
+            index = block.find(phrase)
+            while index != -1:
+                if not _is_negated(block, index) and _is_grounded(
+                    block, index, len(phrase), location_tokens
+                ):
+                    return original_phrase
+                index = block.find(phrase, index + 1)
     return None
 
 
 def find_false_positive_findings(review_text):
     """Return the reviewer lines that look like Major/Critical findings.
 
-    Used only on the clean control. This is a transparent heuristic, not ground
-    truth: it surfaces the offending lines so a human can confirm them. See the
-    benchmark README's "Known limitations" section.
+    Used only on a clean control. This is a transparent heuristic, not ground
+    truth: it surfaces the offending lines (line-leading severity labels incl.
+    markdown headings, plus inline **emphasized** ones) so a human can confirm
+    them. See the benchmark README's "Known limitations" section.
     """
     matches = []
     for line in review_text.splitlines():
-        if FALSE_POSITIVE_SEVERITY_RE.match(line):
+        if FALSE_POSITIVE_SEVERITY_RE.match(line) or _INLINE_FALSE_POSITIVE_RE.search(line):
             matches.append(line.strip())
     return matches
 
@@ -121,14 +204,14 @@ def score_fixture(fixture, review_text):
     caught = []
     missed = []
     for defect in fixture["defects"]:
-        matched_keyword = defect_is_caught(defect, review_text, fixture["id"])
+        matched_phrase = defect_is_caught(defect, review_text, fixture["id"])
         record = {
             "id": defect["id"],
             "category": defect["category"],
             "severity": defect["severity"],
         }
-        if matched_keyword is not None:
-            record["matched_keyword"] = matched_keyword
+        if matched_phrase is not None:
+            record["matched_phrase"] = matched_phrase
             caught.append(record)
         else:
             missed.append(record)

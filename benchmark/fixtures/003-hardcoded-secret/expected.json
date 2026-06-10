@@ -13,13 +13,19 @@
         "hardcoded secret",
         "hard-coded secret",
         "hardcoded credential",
-        "secret",
-        "api key",
-        "credential",
+        "hardcoded api key",
+        "hardcoded key",
+        "secret in source",
+        "committed secret",
+        "read from the environment",
         "environment variable",
         "secret manager",
-        "leak",
-        "rotate"
+        "rotate the key",
+        "leaked credential"
+      ],
+      "location_tokens": [
+        "api_key",
+        "client.py"
       ]
     }
   ]

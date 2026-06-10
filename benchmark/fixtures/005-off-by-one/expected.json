@@ -1,6 +1,6 @@
 {
   "id": "005-off-by-one",
-  "title": "Off-by-one: sliding window overruns the list at the tail",
+  "title": "Off-by-one: short final windows still divided by the full window size",
   "language": "python",
   "defects": [
     {
@@ -12,16 +12,19 @@
       "match_any": [
         "off-by-one",
         "off by one",
-        "out of range",
-        "overrun",
         "divides by window",
         "divide by window",
-        "shorter than",
+        "shorter than window",
+        "shorter than the window",
+        "final window",
         "last window",
-        "tail",
         "len(values) - window",
-        "boundary",
-        "incorrect average"
+        "incorrect average",
+        "wrong average"
+      ],
+      "location_tokens": [
+        "moving_average",
+        "window.py"
       ]
     }
   ]

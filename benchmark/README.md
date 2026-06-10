@@ -18,12 +18,31 @@ the **expected finding** for each, the harness reports:
 
 - **Catch-rate** — `caught / total planted defects` (per fixture and overall).
 - **Misses** — planted defects no reviewer flagged.
-- **False positives** — Major/Critical findings raised against the **clean
-  control** fixture, which has no real defect.
+- **False positives** — Major/Critical findings raised against a **control**
+  fixture (a clean change or a near-miss), which has no real defect.
 
-A catch is recorded when any of a defect's `match_any` keywords appears in the
-reviewer's output. Keyword lists live in each fixture's `expected.json`, so
-tuning sensitivity is a data edit, not a code change.
+### What counts as a catch
+
+A naive "does any keyword appear?" test is trivially gameable: a reviewer that
+emits a constant blob of defect keywords without reading the code would score a
+perfect catch-rate, defeating the whole point (making review quality
+*falsifiable*). So a defect is **caught** only when the review contains, inside a
+single block (paragraph), **all** of:
+
+1. one of the defect's specific `match_any` **phrases** — multi-word and
+   defect-specific (e.g. `"sql injection"`, `"parameterized query"`), not bare
+   nouns like `"injection"` that show up in unrelated prose; **and**
+2. that phrase in a **non-negated** context — "there is no SQL injection here"
+   does not count as catching the SQL-injection defect; **and**
+3. a **location** reference — one of the defect's `location_tokens` (the function
+   name or file from the diff) — within ~160 characters of the phrase.
+
+Requirement 3 is the key anti-gaming property: to ground a catch the reviewer
+must cite the symbol/file it was handed, i.e. it must actually have read the
+change. Citing `file:line` / the symbol is exactly what real reviewers (and this
+repo's reviewer agents) are told to do, so this rewards genuine findings and
+rejects keyword splatter. Phrase and location lists live in each fixture's
+`expected.json`, so tuning a match is a data edit, not a code change.
 
 ## Layout
 
@@ -33,21 +52,29 @@ benchmark/
   run_benchmark.py          harness: collect reviews, score, print a scorecard
   score.py                  pure scoring logic (no I/O / subprocess) — unit tested
   test_score.py             co-located unit tests for the scorer
+  test_run_benchmark.py     co-located unit tests for the harness
   fixtures/
     001-sql-injection/      each fixture is a directory:
       diff.patch              the change under review (a unified diff)
-      expected.json           planted defect(s) + match keywords
+      expected.json           planted defect(s) + match phrases + location tokens
     002-command-injection/
     003-hardcoded-secret/
     004-none-deref/
     005-off-by-one/
     006-resource-leak/
-    007-clean-control/      no planted defect — measures false positives
+    007-clean-control/      no change of concern — measures false positives
+    008-clean-parameterized-query/  near-miss control (looks like 001, but safe)
+    009-clean-subprocess-list/      near-miss control (looks like 002, but safe)
+    010-clean-with-open/            near-miss control (looks like 006, but safe)
 ```
 
 The corpus spans security defects (SQL injection, command injection, hardcoded
 secret), correctness defects (unchecked `None`, off-by-one), a reliability defect
-(leaked file handle), and one deliberately clean change.
+(leaked file handle), and **four controls**: one plainly-clean change plus three
+**near-misses** that touch the same APIs as a defect fixture but are actually
+correct (a parameterized query, a `subprocess` argument list, a `with open`).
+Near-misses measure *precision* — they catch a trigger-happy reviewer that flags
+"SQL injection" whenever it sees SQL.
 
 ### Fixture format (`expected.json`)
 
@@ -63,13 +90,27 @@ secret), correctness defects (unchecked `None`, off-by-one), a reliability defec
       "severity": "critical",
       "location": "app/users.py:find_user_by_name",
       "description": "Human-readable explanation of the planted defect.",
-      "match_any": ["sql injection", "parameterized", "injection"]
+      "match_any": ["sql injection", "parameterized query", "bound parameter"],
+      "location_tokens": ["find_user_by_name", "users.py"]
     }
   ]
 }
 ```
 
-A fixture with an empty `defects` list is a **clean control**.
+**Required** keys on each defect (the scorer rejects a fixture that omits them):
+
+- `id` — unique within the fixture.
+- `category`, `severity` — labels for reporting.
+- `match_any` — non-empty list of specific phrases; a catch needs one of them.
+- `location_tokens` — non-empty list of symbols/filenames; a catch must cite one
+  near the phrase. This is what makes a catch a *located* finding.
+
+**Optional** keys: `location` (human-readable `file:symbol`, for documentation),
+`description` (prose explanation). A top-level **`note`** documents a control's
+intent (why a near-miss is actually safe) and is ignored by the scorer.
+
+A fixture with an empty `defects` list is a **control**; add a `note` explaining
+what makes it clean (especially for a near-miss).
 
 ## Running it
 
@@ -90,15 +131,34 @@ python3 benchmark/run_benchmark.py --review-dir path/to/reviews
 ```
 
 **Drive a reviewer live** with `--reviewer-cmd`. The harness runs the command
-once per fixture; the unified diff is piped on **stdin**, and two environment
-variables are set: `BENCHMARK_DIFF` (path to the diff) and `BENCHMARK_FIXTURE_ID`.
-Whatever the command prints to **stdout** is captured as the review.
+once per fixture; the unified diff is piped on **stdin**. To avoid leaking the
+answer key, the command is **not** told which fixture it is reviewing — instead
+it receives `BENCHMARK_DIFF` (path to a temp copy of the diff with an opaque
+filename) and `BENCHMARK_FIXTURE_TOKEN` (a random per-run token). The
+human-readable fixture id is never exposed (any inherited `BENCHMARK_FIXTURE_ID`
+is stripped), so a reviewer cannot special-case a fixture or tell which one is the
+control. Whatever the command prints to **stdout** is captured as the review.
 
 ```bash
 # Toy reviewer (pattern match) — just to show the wiring:
 python3 benchmark/run_benchmark.py --reviewer-cmd \
   'grep -qi "shell=True" "$BENCHMARK_DIFF" && echo "- Critical: command injection"'
 ```
+
+**Compare configurations** (the [#10](../../../issues/10) gate). Pass `--config
+NAME=SPEC` repeatedly, where `SPEC` is `cmd:<command>` or `dir:<path>`. The
+harness scores each configuration and prints a side-by-side table plus deltas vs.
+the first one — so "what does cutting a reviewer cost?" becomes a measured number,
+not a guess:
+
+```bash
+python3 benchmark/run_benchmark.py \
+  --config "nine=dir:reviews/nine-agent" \
+  --config "five=dir:reviews/five-agent"
+```
+
+`--reviewer-cmd` / `--review-dir` are shorthands for a single
+`--config default=...`.
 
 ### Wiring a Copilot CLI review agent
 
@@ -123,40 +183,70 @@ the review to stdout.
 ```
 == Catch-rate benchmark ==
 
-fixture                defects  caught  result
-----------------------------------------------
-001-sql-injection      1        1/1     ALL CAUGHT
+fixture                        defects  caught  result
+------------------------------------------------------
+001-sql-injection              1        1/1     ALL CAUGHT
 ...
-007-clean-control      0        -       clean (no false positives)
+007-clean-control              0        -       clean (no false positives)
+008-clean-parameterized-query  0        -       clean (no false positives)
 
 == Summary ==
-  fixtures scored : 7
+  fixtures scored : 10
   catch-rate      : 83% (5/6)
   defects missed  : 1
-  false positives : 0 (on clean control)
+  false positives : 0 (on clean/near-miss controls)
 ```
 
-Add `--json` for machine-readable output. **Exit code:** `0` when every planted
-defect was caught, `2` when any defect was missed (so the benchmark can gate CI
-later), and `1` on a usage/corpus error.
+With two or more `--config`s the harness prints a comparison table instead:
+
+```
+== Catch-rate comparison ==
+
+configuration        catch-rate       missed   false-pos
+--------------------------------------------------------
+nine                 100% (6/6)       0        0
+five                 83% (5/6)        1        0
+
+== Deltas vs 'nine' ==
+  five               catch-rate -17 pts, false-positives +0
+```
+
+Add `--json` for machine-readable output. **Exit code** (single configuration):
+`0` when every planted defect was caught, `2` when any defect was missed (so the
+benchmark can gate CI later), and `1` on a usage/corpus error. Comparison runs are
+informational and exit `0` unless the corpus itself fails to load.
 
 ## Known limitations (this is a POC, not ground truth)
 
 These are the tar-pits the architect's triage flagged for [#9](../../../issues/9).
 They are why this is gated as a proof of concept rather than wired into CI today:
 
-- **Keyword matching is shallow.** A catch means a keyword appeared, not that the
-  reviewer truly understood the defect. A reviewer could "catch" by luck, and a
-  correct finding worded unusually could be scored as a miss. The fixture id is
-  stripped from the review text before matching so an echoed id can't fake a catch
-  (see `strip_fixture_id`), but the keyword lists still need human curation.
-- **False-positive scoring is heuristic.** The clean control flags lines that look
-  like Major/Critical findings (bulleted/bolded severity labels); it surfaces the
-  offending lines for human confirmation rather than asserting they are wrong.
-  Minor/Nit suggestions on clean code are not penalized.
-- **Small corpus.** Seven fixtures is enough to prove the mechanism, not to make
-  statistically meaningful claims. A trusted version needs 15–30+ fixtures across
-  more languages and defect classes.
+- **Matching is phrase + location, not comprehension.** A catch means a specific
+  phrase appeared, non-negated, next to a cited location — strong evidence the
+  reviewer read the diff, but still not proof it *understood* the defect. A correct
+  finding worded entirely outside the `match_any`/`location_tokens` vocabulary can
+  still score as a miss, so the lists need human curation.
+- **Residual answer-key attack.** Requiring a located, specific phrase defeats a
+  constant keyword blob (it can't cite per-fixture symbols) and the old
+  fixture-id leak. A determined attacker could still read every diff and assemble a
+  per-fixture key (correct symbol + phrase adjacency) — but that requires actually
+  reading the code, which is the behavior we want. Mitigations for a trusted
+  version: opaque/rotating fixture ids (the harness already withholds the id and
+  uses a random per-run token), a private held-out corpus, and periodic fixture
+  rotation.
+- **False-positive scoring is heuristic.** A control flags lines that look like
+  Major/Critical findings (line-leading or inline-bolded severity labels, incl.
+  markdown headings); it surfaces the offending lines for human confirmation rather
+  than asserting they are wrong. Minor/Nit suggestions on clean code are not
+  penalized.
+- **Negation handling is shallow.** A short window before the phrase is scanned for
+  negation cues; unusual phrasing ("hardly a real injection") may slip through.
+  Phrase specificity and location grounding are the primary defenses; negation is a
+  secondary guard.
+- **Small corpus.** Ten fixtures (6 defects, 4 controls) is enough to prove the
+  mechanism, not to make statistically meaningful claims. A trusted version needs
+  15–30+ fixtures across more languages and defect classes, and a tighter
+  defect-to-control balance.
 - **Model drift.** Live reviewer results will vary run to run; treat a single run
   as a sample, not a fixed score.
 - **Corpus licensing/privacy.** All fixtures here are synthetic and original. Any
@@ -167,8 +257,12 @@ They are why this is gated as a proof of concept rather than wired into CI today
 
 1. Create `benchmark/fixtures/<NNN-short-name>/`.
 2. Add `diff.patch` (a realistic unified diff containing the planted defect).
-3. Add `expected.json` using the format above. List several `match_any` keywords
-   that a competent reviewer would naturally use when describing the defect; keep
-   them specific enough that unrelated prose won't match.
-4. Run `python3 benchmark/test_score.py` — the corpus-integrity tests will load and
-   validate your fixture and fail loudly if it is malformed.
+3. Add `expected.json` using the format above. For each defect, list several
+   `match_any` **phrases** a competent reviewer would naturally use (specific
+   enough that unrelated prose won't match) and the `location_tokens` (function
+   name and/or filename) the reviewer must cite. For a control, use an empty
+   `defects` list and a `note` explaining why it is clean.
+4. Run `python3 benchmark/test_score.py && python3 benchmark/test_run_benchmark.py`
+   — the corpus-integrity tests load and validate your fixture (and confirm each
+   defect is catchable by a review of its own description) and fail loudly if it is
+   malformed.

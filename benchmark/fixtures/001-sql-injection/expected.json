@@ -12,13 +12,18 @@
       "match_any": [
         "sql injection",
         "sqli",
-        "parameterized",
-        "parameterised",
-        "parameterize",
+        "parameterized query",
+        "parameterised query",
+        "parameterized statement",
         "bound parameter",
-        "placeholder",
-        "concatenat",
-        "injection"
+        "query placeholder",
+        "concatenated into the sql",
+        "concatenated into the query",
+        "string-concatenated query"
+      ],
+      "location_tokens": [
+        "find_user_by_name",
+        "users.py"
       ]
     }
   ]

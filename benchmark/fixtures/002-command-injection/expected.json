@@ -16,9 +16,12 @@
         "shell = true",
         "arbitrary command",
         "argument list",
-        "shlex",
         "without a shell",
-        "injection"
+        "shlex"
+      ],
+      "location_tokens": [
+        "archive_path",
+        "backup.py"
       ]
     }
   ]
