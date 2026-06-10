@@ -224,5 +224,53 @@ class CorpusIntegrityTests(unittest.TestCase):
                 )
 
 
+class AntiGamingCorpusTests(unittest.TestCase):
+    """End-to-end proof that the two known gaming strings score 0 catch-rate.
+
+    These reproduce the bypasses the critical/code reviewers demonstrated against
+    the original keyword scorer and assert they now FAIL against the real corpus.
+    """
+
+    def _corpus(self):
+        fixtures = []
+        for entry in sorted(os.listdir(FIXTURES_DIR)):
+            fixture_dir = os.path.join(FIXTURES_DIR, entry)
+            if os.path.isfile(os.path.join(fixture_dir, "expected.json")):
+                fixtures.append(score.load_fixture(fixture_dir))
+        return fixtures
+
+    def _catch_rate(self, review_for):
+        results = [score.score_fixture(f, review_for(f)) for f in self._corpus()]
+        return score.aggregate(results)
+
+    def test_constant_keyword_blob_scores_zero(self):
+        # A reviewer that emits every defect phrase but never cites a location —
+        # the original "perfect score without reading the code" attack (C1).
+        phrases = []
+        for fixture in self._corpus():
+            for defect in fixture["defects"]:
+                phrases.extend(defect["match_any"])
+        blob = " ".join(phrases)
+        summary = self._catch_rate(lambda _f: blob)
+        self.assertEqual(summary["caught"], 0)
+        self.assertEqual(summary["catch_rate"], 0.0)
+
+    def test_defect_dismissing_review_scores_zero(self):
+        # A reviewer that cites the location AND the phrase but DISMISSES it
+        # ("looks correct, no <phrase>") — the code reviewer's demo that scored
+        # 67% at a true 0%. Negation handling must now make this a clean miss.
+        def dismiss(fixture):
+            lines = []
+            for defect in fixture["defects"]:
+                loc = " ".join(defect["location_tokens"])
+                for phrase in defect["match_any"]:
+                    lines.append("%s looks correct; there is no %s here." % (loc, phrase))
+            return "\n".join(lines) or "Looks correct, no issues."
+
+        summary = self._catch_rate(dismiss)
+        self.assertEqual(summary["caught"], 0)
+        self.assertEqual(summary["catch_rate"], 0.0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
