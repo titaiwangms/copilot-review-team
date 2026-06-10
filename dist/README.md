@@ -36,7 +36,19 @@ Two options, both tooling-free (full instructions are in the bundle header):
 
 We use textual sentinels rather than Markdown code fences because the agent
 files and playbook contain their own ```` ``` ```` fences; nested fencing would
-break. The sentinels are guarded against collision by the generator.
+break. The sentinels are guarded against collision by the generator. (The
+canonical rationale for this design lives in the
+[`scripts/build-bundle.sh`](../scripts/build-bundle.sh) header and the generated
+bundle's own header — this README summarizes it to avoid drift.)
+
+### Assumptions worth knowing
+
+- **Sources must be newline-terminated** for hand-extraction to be byte-faithful.
+  The generator always emits a correct `END FILE` marker, but a manually
+  extracted copy of a non-newline-terminated source would pick up one extra
+  trailing newline.
+- **The bundle embeds the repo `VERSION`**, so a version-only bump requires
+  regenerating the bundle — CI check **C9** enforces this.
 
 ### How it stays in sync
 

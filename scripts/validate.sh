@@ -166,10 +166,14 @@ fi
 # playbook changes, or zero-tooling adopters get stale content. Enforce that the
 # committed bundle matches a fresh generation from the current sources.
 echo "== C9: zero-tooling bundle drift =="
-if ./scripts/build-bundle.sh --check >/dev/null 2>&1; then
+# Capture output so a PASS stays quiet but a FAILURE shows WHAT drifted (the
+# generator prints a unified diff of committed-vs-fresh on stderr). Using
+# `if ! out=$(...)` keeps this safe under `set -e`.
+if bundle_check_output="$(./scripts/build-bundle.sh --check 2>&1)"; then
   pass "dist bundle matches sources (scripts/build-bundle.sh --check)"
 else
   fail "bundle is stale — regenerate with scripts/build-bundle.sh"
+  printf '%s\n' "$bundle_check_output"
 fi
 
 echo ""

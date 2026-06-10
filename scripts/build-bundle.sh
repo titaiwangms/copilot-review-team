@@ -28,6 +28,14 @@
 #   scripts/build-bundle.sh --stdout   # print the bundle to stdout (no file write)
 #
 # Dependencies: bash only.
+#
+# Notes / assumptions (canonical rationale lives here; dist/README.md points back):
+#   - Round-trip byte-faithfulness assumes each source file is newline-terminated.
+#     The generator still emits a correct END marker for a file lacking a trailing
+#     newline, but a hand-extracted copy would then gain one trailing newline.
+#   - The bundle embeds the repo VERSION, so a version-only bump (editing VERSION)
+#     changes the bundle and requires regenerating it. CI check C9 enforces this.
+# --- end usage ---
 
 set -euo pipefail
 
@@ -50,8 +58,16 @@ case "${1:-}" in
   --check) mode="check" ;;
   --stdout) mode="stdout" ;;
   -h|--help)
-    # Print this script's header comment block as help.
-    sed -n '/^#/,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # Print the leading comment block (after the shebang) up to the
+    # `# --- end usage ---` sentinel, stripping the `# ` comment prefix.
+    # Content-anchored to the sentinel so it never depends on line numbers,
+    # matching the convention in set-models.sh / uninstall.sh.
+    awk '
+      NR == 1 { next }
+      /^# --- end usage ---$/ { exit }
+      /^#/ { sub(/^# ?/, ""); print; next }
+      { exit }
+    ' "${BASH_SOURCE[0]}"
     exit 0
     ;;
   *)
@@ -64,11 +80,13 @@ VERSION="$(tr -d '[:space:]' < VERSION 2>/dev/null || true)"
 [ -n "$VERSION" ] || VERSION="unknown"
 
 # Collect the source files in a stable, deterministic order: agents sorted by
-# name, then the playbook last.
+# name (locale-pinned with LC_ALL=C so ordering is stable across machines and
+# can't make C9 report a false 'stale' on a future punctuated filename), then
+# the playbook last.
 AGENT_FILES=()
 while IFS= read -r f; do
   AGENT_FILES+=("$f")
-done < <(find "$AGENTS_DIR" -maxdepth 1 -name 'local-*.agent.md' | sort)
+done < <(find "$AGENTS_DIR" -maxdepth 1 -name 'local-*.agent.md' | LC_ALL=C sort)
 
 if [ "${#AGENT_FILES[@]}" -eq 0 ]; then
   echo "build-bundle.sh: no agent files found in $AGENTS_DIR/ — aborting" >&2
