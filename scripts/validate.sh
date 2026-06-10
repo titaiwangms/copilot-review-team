@@ -15,7 +15,7 @@ FAILURES=0
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*"; FAILURES=$((FAILURES + 1)); }
 
-SCRIPTS="install.sh uninstall.sh set-models.sh scripts/validate.sh"
+SCRIPTS="install.sh uninstall.sh set-models.sh scripts/validate.sh scripts/build-bundle.sh"
 
 # --- prerequisite: python3 ---
 echo "== prerequisites =="
@@ -158,6 +158,18 @@ if [ -s VERSION ]; then
   fi
 else
   fail "VERSION file missing or empty"
+fi
+
+# --- C9: zero-tooling bundle in sync ---
+# The committed paste-able bundle (dist/copilot-review-team-bundle.md) is a
+# generated artifact. It must be regenerated whenever an agent definition or the
+# playbook changes, or zero-tooling adopters get stale content. Enforce that the
+# committed bundle matches a fresh generation from the current sources.
+echo "== C9: zero-tooling bundle drift =="
+if ./scripts/build-bundle.sh --check >/dev/null 2>&1; then
+  pass "dist bundle matches sources (scripts/build-bundle.sh --check)"
+else
+  fail "bundle is stale — regenerate with scripts/build-bundle.sh"
 fi
 
 echo ""
