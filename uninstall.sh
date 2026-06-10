@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# uninstall.sh — remove the Copilot Review + Build Team that install.sh placed in
+# uninstall.sh — remove the Copilot CLI Review + Build Team that install.sh placed in
 # ~/.copilot/.
 #
 # Safety: this removes ONLY explicit agent basenames — the union of this repo's
