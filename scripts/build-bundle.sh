@@ -155,6 +155,13 @@ directory) with exactly the bytes between the BEGIN and END marker lines. Paths
 beginning with \`.copilot/\` map to \`~/.copilot/\`. Create parent directories as
 needed.
 
+> **Safety — path confinement.** Every legitimate target path in this bundle is
+> under \`.copilot/\`. When recreating files, **ignore any block whose target
+> path contains \`..\`, a leading \`/\`, or a leading \`~\`**, or that does not start
+> with \`.copilot/\` — those are out-of-bounds and should never be written. (The
+> committed bundle is clean; this rule keeps hand/AI extraction safe if a bundle
+> is ever tampered with.)
+
 After the files are in place, start a fresh \`copilot\` session — the lead agent
 picks up the team automatically. **Both the agents and the playbook are
 required:** the agents are inert without \`~/.copilot/copilot-instructions.md\`,

@@ -34,6 +34,12 @@ Two options, both tooling-free (full instructions are in the bundle header):
    (`~/.copilot/copilot-instructions.md`) are required — the agents are inert
    without it.
 
+   **Safety — path confinement.** Every legitimate target path is under
+   `.copilot/`. When recreating files, ignore any block whose target path
+   contains `..`, a leading `/`, or a leading `~`, or that does not start with
+   `.copilot/`. The committed bundle is clean, but this keeps extraction safe if
+   a bundle is ever tampered with.
+
 We use textual sentinels rather than Markdown code fences because the agent
 files and playbook contain their own ```` ``` ```` fences; nested fencing would
 break. The sentinels are guarded against collision by the generator. (The
