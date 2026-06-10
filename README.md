@@ -6,10 +6,10 @@ A drop-in **multi-agent SDLC team** for [GitHub Copilot CLI](https://github.com/
 it **designs, builds, reviews, and fixes** code, end to end.
 
 Instead of one model doing everything, this setup gives the lead Copilot agent a
-team of specialized sub-agents — an architect and a developer that **build**, five reviewers
-(spread across three model families — Claude, GPT, and Gemini) plus a QA tester that
-**review**, and a tech writer that documents — wired together by a **playbook** into a
-design → build → review → fix pipeline.
+team of specialized sub-agents — an architect, a developer, and a tech writer that
+**build** (design, implement, and document), plus five reviewers (spread across three
+model families — Claude, GPT, and Gemini) and a QA tester that **review** — wired
+together by a **playbook** into a design → build → review → fix pipeline.
 
 The result: code changes get designed up front, implemented, then reviewed in
 parallel for correctness, security, edge cases, spec adherence, cross-module
@@ -47,13 +47,15 @@ scripts/validate.sh           Repo self-checks (run before submitting a PR; also
 examples/                     Illustrative design-doc + review-synthesis samples
 ```
 
-> **One install, two jobs.** This team both **builds** (architect → developer → tech
-> writer) and **reviews** (five reviewers + QA tester) — two first-class halves of one
-> design → build → review → fix loop, not a review tool with build bolted on. The agent
-> files and the `copilot-instructions.md` playbook ship together: the agents define *who*
-> is on the team, the playbook tells the lead agent *when* and *how* to fan them out. Install
-> both for the full workflow; you can still invoke just the review half (see
+> **One install, two jobs.** This team is two first-class halves of a single
+> design → build → review → fix loop — a **build** side (architect → developer → tech
+> writer) and a **review** side (five reviewers + QA tester) — not a review tool with
+> build bolted on. Use the whole pipeline, or just the review half (see
 > ["How it behaves"](#how-it-behaves)).
+>
+> **Agents + playbook ship together.** The agent files define *who* is on the team; the
+> `copilot-instructions.md` playbook tells the lead agent *when* and *how* to fan them
+> out. Install both for the full workflow.
 
 The `local-` prefix is just a namespace convention to mark these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you

@@ -83,8 +83,9 @@ When uncertain, ask the architect first — its triviality check (`SKIP_ARCHITEC
    `local-developer` again with the consolidated findings. Re-run review fan-out only
    on what changed.
    - **Update the ledger each round.** Every Major/Critical finding ends the round with
-     exactly one disposition: **addressed**, **deferred** (with where it's tracked), or
-     **rejected** (with a one-line reason). Carry the ledger across rounds; never reset it.
+     exactly one disposition — the **addressed / deferred / rejected** vocabulary is
+     defined canonically in [Dissent handling §1](#dissent-handling-minority-report--findings-ledger--residual-risk).
+     Carry the ledger across rounds; never reset it.
    - **Iteration cap: 2 rounds maximum.** After 2 rounds, stop and surface remaining
      findings to the user as known limitations rather than looping further.
 8. **Docs.** When implementation is settled, delegate `local-tech-writer` for any
