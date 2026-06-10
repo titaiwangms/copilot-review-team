@@ -39,9 +39,7 @@ agents/                       9 sub-agent definitions
   local-qa-tester.agent.md          Actually runs the code, reports repro steps
   local-tech-writer.agent.md        Docs, examples, READMEs, changelogs
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
-models.conf                   Agent → model mapping (the knob you edit to swap models)
-set-models.sh                 Applies models.conf to the agents + playbook table
-install.sh                    Copies everything into ~/.copilot/
+install.sh                    Copies everything into ~/.copilot/ (supports an optional model override)
 uninstall.sh                  Removes this repo's agents from ~/.copilot/ (leaves others alone)
 scripts/validate.sh           Repo self-checks (run before submitting a PR; also runs in CI)
 scripts/build-bundle.sh       Generates the zero-tooling paste-able bundle from the agents + playbook
@@ -149,28 +147,37 @@ Different model families have different blind spots. Reviewing Claude-written co
 with GPT and Gemini catches things a same-family reviewer misses. If you swap
 models, keep developer and the adversarial reviewers in **different** families.
 
-The exact model IDs live in each `agents/local-*.agent.md` and in the table in
-`copilot-instructions.md`. Adjust them to whatever your Copilot CLI account has
-access to — if a referenced model isn't available to you, point that agent at one
-that is.
+The model ID for each agent lives in one place: the `model:` line in that
+agent's `agents/local-*.agent.md` frontmatter (the single source of truth).
+Adjust it to whatever your Copilot CLI account has access to — if a referenced
+model isn't available to you, point that agent at one that is.
 
 ### Customizing models
 
-Don't hand-edit the model IDs in nine agent files and the playbook table
-separately — they have to stay in sync. Instead, edit the single mapping in
-[`models.conf`](models.conf) and let the tooling apply it everywhere:
+For a permanent change, edit the `model:` line in the relevant
+`agents/local-*.agent.md` and run `./install.sh`.
+
+To override models **without editing the repo** (handy for forks, experiments, or
+pinning a whole org to one model), give `install.sh` an override file. It is
+applied only to the copies written into `~/.copilot/`; your repo files are never
+touched:
 
 ```bash
-$EDITOR models.conf        # change the model IDs you want
-./set-models.sh --dry-run  # preview the exact edits (writes nothing)
-./set-models.sh            # apply to agent frontmatter + the playbook table
-./install.sh               # copy the updated files into ~/.copilot/
+cat > models.override <<'EOF'
+# one "agent-name model-id" per line; '*' sets the default for every agent
+local-code-reviewer  gpt-5.4
+*                    claude-opus-4.8   # pin everyone else to one model
+EOF
+./install.sh                                   # picks up ./models.override
+# or point at a file anywhere:
+COPILOT_MODEL_OVERRIDE=/path/to/models.override ./install.sh
 ```
 
-`./set-models.sh --check` verifies the agent frontmatter and the playbook table
-agree (this is what CI runs); it exits nonzero on drift. The prettified family
-names in the prose (e.g. "Claude Opus 4.8") are a manual concern — the tool only
-touches the machine-readable model IDs.
+An explicit per-agent entry wins over the `*` wildcard. A malformed override, or
+one that names an agent that doesn't exist, fails the install rather than
+silently doing nothing. The prettified family names in the prose (e.g. "Claude
+Opus 4.8") are a manual concern — overrides only touch the machine-readable
+`model:` line.
 
 To remove the team later, run [`./uninstall.sh`](uninstall.sh) — it removes only
 the agent files this repo installed (your other `local-*` agents are left alone)

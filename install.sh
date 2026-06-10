@@ -21,6 +21,14 @@
 # and prunes agents that earlier versions shipped but this one no longer does.
 # Pruning is driven ONLY by the previous manifest's AGENT= entries (never by
 # globbing ~/.copilot/agents/), so unrelated local-* agents are left untouched.
+#
+# Model selection: each agent's model lives in its own frontmatter `model:` line
+# (the single source of truth). To override models at install time WITHOUT
+# editing the repo, point COPILOT_MODEL_OVERRIDE at a file (or drop a
+# ./models.override next to this script). Format: `agent-name model-id` per line,
+# plus an optional `*  model-id` wildcard to pin every agent to one model. The
+# override is applied only to the copies written into ~/.copilot; the repo files
+# are never touched.
 
 set -euo pipefail
 
@@ -111,6 +119,40 @@ install_file() {
   mv -T "$tmp" "$target"
 }
 
+# --- Optional model override (install-time only; never edits the repo) ---
+# Resolve the override source: an explicit COPILOT_MODEL_OVERRIDE file wins;
+# otherwise an optional ./models.override beside this script is used if present.
+# When active, we stage the agent files into a temp dir with the override
+# applied and install FROM that staging dir, so the repo's agents/ are untouched
+# and the added/updated/unchanged classification stays accurate and idempotent.
+AGENT_SRC_DIR="$SRC_DIR/agents"
+STAGE_DIR=""
+cleanup_stage() { [ -n "$STAGE_DIR" ] && rm -rf "$STAGE_DIR"; }
+trap cleanup_stage EXIT
+
+OVERRIDE_FILE=""
+if [ -n "${COPILOT_MODEL_OVERRIDE:-}" ]; then
+  OVERRIDE_FILE="$COPILOT_MODEL_OVERRIDE"
+  if [ ! -e "$OVERRIDE_FILE" ]; then
+    echo "error: COPILOT_MODEL_OVERRIDE points to a missing file: $OVERRIDE_FILE" >&2
+    exit 1
+  fi
+elif [ -e "$SRC_DIR/models.override" ]; then
+  OVERRIDE_FILE="$SRC_DIR/models.override"
+fi
+
+if [ -n "$OVERRIDE_FILE" ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 is required to apply model overrides but was not found on PATH" >&2
+    exit 1
+  fi
+  STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/copilot-review-team-stage.XXXXXX")"
+  echo "  model override: $OVERRIDE_FILE"
+  OVERRIDE_FILE="$OVERRIDE_FILE" SRC_AGENTS="$SRC_DIR/agents" STAGE_DIR="$STAGE_DIR" \
+    python3 "$SRC_DIR/scripts/_apply_overrides.py"
+  AGENT_SRC_DIR="$STAGE_DIR"
+fi
+
 # --- Agents ---
 # Classify each agent this version ships by its on-disk effect, then copy it.
 # We also record the NEW agent set (for the manifest and orphan computation).
@@ -118,7 +160,7 @@ declare -A NEW_AGENT_SET=()
 ADDED=()
 UPDATED=()
 UNCHANGED=()
-for f in "$SRC_DIR"/agents/local-*.agent.md; do
+for f in "$AGENT_SRC_DIR"/local-*.agent.md; do
   name="$(basename "$f")"
   NEW_AGENT_SET[$name]=1
   target="$AGENTS_DIR/$name"
@@ -206,7 +248,7 @@ echo "  playbook: copilot-instructions.md"
   echo "VERSION=$NEW_VERSION"
   echo "INSTALLED_AT=$TIMESTAMP"
   echo "ORIGINAL_PLAYBOOK_BACKUP=$ORIG_PLAYBOOK_BACKUP"
-  for f in "$SRC_DIR"/agents/local-*.agent.md; do
+  for f in "$AGENT_SRC_DIR"/local-*.agent.md; do
     echo "AGENT=$(basename "$f")"
   done
 } > "$MANIFEST"
