@@ -33,6 +33,13 @@ anything.
 - **Keep agents self-contained.** Each `local-*.agent.md` is a fresh context — don't
   assume it can see conversation state.
 
+- **Bump the `VERSION` file when shipping changes.** It holds a single semver line
+  (e.g. `1.0.0`). `install.sh` reads it to stamp the install and to print a
+  `version -> version` change summary on upgrade. The install manifest
+  (`~/.copilot/.copilot-review-team-manifest`) now also records `VERSION=` and
+  `INSTALLED_AT=` alongside the existing `AGENT=` / `ORIGINAL_PLAYBOOK_BACKUP=`
+  lines; bumping `VERSION` is what makes the next install report an upgrade.
+
 - **Run the self-checks** before submitting:
 
   ```bash

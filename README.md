@@ -75,6 +75,12 @@ automatically.
 matching agent files to `~/.copilot/.backup-<timestamp>-<pid>/` before overwriting, so
 it's safe to re-run.
 
+Re-running `./install.sh` upgrades in place: it stamps the installed version,
+prints a `version -> version` change summary (added / updated / unchanged /
+removed per agent), and prunes any agents that were removed or renamed in a
+newer version. Unrelated `local-*` agents you installed yourself are never
+touched — only agents recorded in this repo's install manifest are pruned.
+
 `install.sh` and `uninstall.sh` honor a `$COPILOT_HOME` environment variable if your
 Copilot CLI keeps its config somewhere other than the default `~/.copilot`.
 

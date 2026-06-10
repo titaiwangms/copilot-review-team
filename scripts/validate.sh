@@ -147,6 +147,19 @@ else
   fail "tool privilege check (scripts/_check_tools.py)"
 fi
 
+# --- C8: VERSION file present and well-formed ---
+echo "== C8: VERSION file =="
+if [ -s VERSION ]; then
+  version_str="$(tr -d '[:space:]' < VERSION)"
+  if printf '%s' "$version_str" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    pass "VERSION is non-empty and looks like a version ($version_str)"
+  else
+    fail "VERSION does not look like a version (got: '$version_str')"
+  fi
+else
+  fail "VERSION file missing or empty"
+fi
+
 echo ""
 if [ "$FAILURES" -eq 0 ]; then
   echo "All checks passed."
