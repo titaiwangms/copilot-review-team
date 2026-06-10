@@ -15,7 +15,7 @@ The result: code changes get designed up front, implemented, then reviewed in
 parallel for correctness, security, edge cases, spec adherence, cross-module
 integration, and readability — and looped back for fixes — before they ever reach you.
 
-Want just a review pass? Ask it to **"review &lt;PR&gt;"** and it runs the reviewers only,
+Want just a review pass? Ask it to **"review &lt;PR url&gt;"** and it runs the reviewers only,
 without touching code (the QA tester, which *executes* code, sits out). **Build and review
 are two first-class halves of one team** — use the whole pipeline or either half on its own.
 
