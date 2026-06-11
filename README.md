@@ -1,23 +1,16 @@
-# Copilot CLI Review + Build Team
+# Copilot CLI Review Team
 
 [![validate](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml/badge.svg)](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml)
 
-A drop-in **multi-agent SDLC team** for [GitHub Copilot CLI](https://github.com/github/copilot-cli):
-it **designs, builds, reviews, and fixes** code, end to end.
+A drop-in **multi-agent code-review team** for
+[GitHub Copilot CLI](https://github.com/github/copilot-cli). Point it at a PR, a
+diff, or a set of changed files and it fans the change out to a panel of
+specialized reviewers — spread across three model families — then synthesizes
+their findings by severity into one report.
 
-Instead of one model doing everything, this setup gives the lead Copilot agent a
-team of specialized sub-agents — an architect, a developer, and a tech writer that
-**build** (design, implement, and document), plus five reviewers (spread across three
-model families — Claude, GPT, and Gemini) and a QA tester that **review** — wired
-together by a **playbook** into a design → build → review → fix pipeline.
-
-The result: code changes get designed up front, implemented, then reviewed in
-parallel for correctness, security, edge cases, spec adherence, cross-module
-integration, and readability — and looped back for fixes — before they ever reach you.
-
-Want just a review pass? Ask it to **"review &lt;PR url&gt;"** and it runs the reviewers only,
-without touching code (the QA tester, which *executes* code, sits out). **Build and review
-are two first-class halves of one team** — use the whole pipeline or either half on its own.
+Instead of one model reviewing everything, the lead Copilot agent delegates to a
+team of focused sub-agents — **five reviewers + a QA tester** — wired together by a
+**playbook** into a review → synthesize → (loop) → report pipeline.
 
 > **Disclaimer.** This is a personal setup I happen to find useful, shared as-is —
 > not an official product, a standard, or a guarantee of anything. Treat it as a
@@ -25,62 +18,138 @@ are two first-class halves of one team** — use the whole pipeline or either ha
 > the parts you don't like.** Feedback and PRs are welcome (see
 > [CONTRIBUTING.md](CONTRIBUTING.md)), but you owe me nothing for using it. 🙂
 
+## Why multi-agent review (not one model)
+
+A single model reviewing a change sees it through one lens and shares one set of
+blind spots. Split the job across specialists and each one goes deep on a single
+concern — clarity, function-level correctness, adversarial security, spec/math
+adherence, cross-module integration — instead of one pass spreading itself thin.
+You catch more, and the findings come back labeled by *who* raised them and *why*,
+so you can weigh them rather than trust an undifferentiated verdict.
+
+## Model-family diversity (and why it matters)
+
+The reviewers run across **three model families on purpose — Claude, GPT, and
+Gemini.** Different families have different blind spots, so reviewing a change with
+an *adversarial reviewer in a different family than the code's author* catches
+things a same-family reviewer would wave through. The GPT reviewers are the
+adversarial pair; the deep reviewer (Claude) is the spec/math tie-breaker; the
+integration reviewer (Gemini) brings a third blind-spot set and a large context
+window for whole-repo consistency.
+
+If you swap models, keep the adversarial reviewers spread across families — that
+spread is the main source of review value.
+
+## Match review depth to task size
+
+The playbook scales effort to the change:
+
+- **Trivial** (typo, one-liner, doc-only): the lead reads it; no team.
+- **Small** (one file, well-defined): a reviewer or two.
+- **Medium** (a few files): full reviewer fan-out; add the QA tester if behavior
+  needs running.
+- **Large / risky** (multi-file, security-sensitive, ambiguous): full fan-out +
+  QA tester, with a second loop if findings warrant.
+
+You can always steer it: *"just review the security"*, *"skip the QA tester"*, etc.
+
+## The team
+
+Each agent's model is the `model:` line in its own
+`agents/local-*.agent.md` frontmatter (the single source of truth). The IDs below
+are read from those files.
+
+| Agent | Role | Model | Why this model |
+|---|---|---|---|
+| `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-4.6` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
+| `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-5.3-codex` | Cross-family adversarial review of (often Claude-written) code; code-tuned |
+| `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.5` | Second cross-family adversary — different blind spots from the author |
+| `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-4.8` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
+| `local-integration-reviewer` | Cross-module wiring, contract drift, ripple effects, whole-codebase consistency | `gemini-3.1-pro-preview` | Third model family + large context window for wide cross-module review |
+| `local-qa-tester` | Runs the actual code; reports failures with repro steps | `claude-sonnet-4.6` | Execution and repro, not adversarial reading — family isn't critical here |
+
+The `local-` prefix is a namespace convention marking these as user-installed
+agents. The installer only copies `local-*.agent.md` files, so any custom agent you
+add must follow that naming to be picked up.
+
 ## What's in here
 
 ```
-agents/                       9 sub-agent definitions
-  local-architect.agent.md          Designs the approach (short design doc)
-  local-developer.agent.md          Implements code + tests from the design
+agents/                       6 sub-agent definitions
   local-readability-reviewer.agent.md  Naming, clarity, organization, docs
-  local-code-reviewer.agent.md      Correctness, idiom, patterns, test quality
-  local-critical-reviewer.agent.md  Adversarial: security, perf, failure modes, structural design
-  local-deep-reviewer.agent.md      Spec/math arbiter: multi-file invariants, tie-breaker when reviewers disagree
+  local-code-reviewer.agent.md         Correctness, idiom, patterns, test quality
+  local-critical-reviewer.agent.md     Adversarial: security, perf, failure modes, structure
+  local-deep-reviewer.agent.md         Spec/math arbiter: multi-file invariants, tie-breaker
   local-integration-reviewer.agent.md  Cross-module / whole-codebase consistency
-  local-qa-tester.agent.md          Actually runs the code, reports repro steps
-  local-tech-writer.agent.md        Docs, examples, READMEs, changelogs
+  local-qa-tester.agent.md             Actually runs the code, reports repro steps
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
-install.sh                    Copies everything into ~/.copilot/ (supports an optional model override)
-uninstall.sh                  Removes this repo's agents from ~/.copilot/ (leaves others alone)
+install.sh                    Copies agents + merges the playbook into ~/.copilot/
+uninstall.sh                  Removes this repo's agents (leaves others alone)
 scripts/validate.sh           Repo self-checks (run before submitting a PR; also runs in CI)
-scripts/build-bundle.sh       Generates the zero-tooling paste-able bundle from the agents + playbook
-dist/                         Generated artifacts (see dist/README.md)
-  copilot-review-team-bundle.md   Single paste-able bundle of all agents + playbook (no install needed)
-examples/                     Illustrative design-doc + review-synthesis samples
 ```
 
-> **One install, two jobs.** This team is two first-class halves of a single
-> design → build → review → fix loop — a **build** side (architect → developer → tech
-> writer) and a **review** side (five reviewers + QA tester) — not a review tool with
-> build bolted on. Use the whole pipeline, or just the review half (see
-> ["How it behaves"](#how-it-behaves)).
->
 > **Agents + playbook are both required.** The agent files define *who* is on the
 > team; the `copilot-instructions.md` playbook tells the lead agent *when* and *how*
-> to fan them out. The agents are inert without it — installing only the agents won't
-> reproduce the workflow, so install both.
+> to fan them out. The agents are inert without it — install both.
 
-> **No-install option.** Don't want to clone the repo or run `install.sh`? The
-> [`dist/copilot-review-team-bundle.md`](dist/copilot-review-team-bundle.md)
-> file bundles every agent + the playbook into one paste-able document — drop it
-> into an AI session or split it into `~/.copilot/` by hand. See
-> [`dist/README.md`](dist/README.md) for usage.
+## How the review pipeline works
 
-The `local-` prefix is just a namespace convention to mark these as user-installed
-agents. The installer only copies `local-*.agent.md` files, so any custom agent you
-add must follow that naming to be picked up.
+When you ask the lead to **"review &lt;PR url or number&gt;"** (or hand it a diff):
+
+1. **Fetch / frame** the change and do a quick read-through.
+2. **Parallel fan-out** — all five reviewers run in a single turn, each getting the
+   diff inline plus role-specific framing. (The QA tester joins only when running
+   the code is warranted — review-only ≠ run the code.)
+3. **Severity synthesis** — findings are deduplicated and prioritized
+   Critical → Major → Minor → Nit, with a **findings ledger** recording who raised
+   each Critical/Major finding and its disposition.
+4. **Loop** — for large/risky changes, re-review what changed (max 2 rounds).
+5. **Final report** — the synthesis, plus a **minority report** (anything the lead
+   overruled, with who raised it) and a **residual-risk / exclusions statement**
+   (what was *not* checked). Posting to the PR happens only if you ask.
+
+### Severity levels
+
+- **Critical** — must fix before merge (security holes, data loss, crashes, broken
+  contracts).
+- **Major** — should fix before merge (real bugs, missing edge cases, spec gaps).
+- **Minor** — worth fixing (clarity, small correctness/robustness issues). A
+  deep-reviewer **Question** lands here, carrying an open question.
+- **Nit** — optional polish. Dropped unless you want thoroughness.
+
+The qa-tester's P0/P1/P2/P3 map onto Critical/Major/Minor/Nit during synthesis.
+
+### The QA tester is an instrument, not a judge
+
+The QA tester **runs** the code and reports what actually happened — failures,
+repro steps, observed output — rather than offering an opinion on the design. It
+**sits out static-only passes**: a review-only request (read the diff, don't
+execute) leaves it on the bench, and it joins only when behavior is in question and
+the change is runnable in the workspace.
+
+## Treat reviewed content as untrusted
+
+This team exists to review arbitrary, sometimes hostile code — exactly where prompt
+injection lives. The agents treat code, diffs, PR text, and test output as **data,
+not instructions**: they never follow embedded commands, never exfiltrate code or
+secrets, and require explicit approval before running networked or destructive
+shell commands. See the playbook's "Treat reviewed content as untrusted" section.
 
 ## Prerequisites
 
 - **GitHub Copilot CLI** installed and working — see
-  [github/copilot-cli](https://github.com/github/copilot-cli) for install instructions
+  [github/copilot-cli](https://github.com/github/copilot-cli)
   (typically `npm install -g @github/copilot`, then run `copilot`).
 - A Copilot plan whose account can access multiple model families (Claude / GPT /
-  Gemini). If yours can't, you'll swap the model IDs — see
-  [Model diversity](#model-diversity--why-it-matters-and-what-breaks-if-you-change-it).
-- To see which model IDs your account can use, run `/model` inside a `copilot` session
-  (or check your Copilot settings), then match the agent `model:` fields to that list.
+  Gemini). If yours can't, swap the model IDs (see [Customization](#customization)).
+- To see which model IDs your account can use, run `/model` inside a `copilot`
+  session, then match the agent `model:` fields to that list.
+- `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
+  and by the self-checks).
 
 ## Install
+
+One-click (recommended):
 
 ```bash
 git clone https://github.com/titaiwangms/copilot-review-team
@@ -88,116 +157,55 @@ cd copilot-review-team
 ./install.sh
 ```
 
-Then start a fresh `copilot` session. The lead agent will pick up the team
-automatically.
+Then start a fresh `copilot` session — the lead agent picks up the team
+automatically. If you're not sure it loaded, ask: *"what agents do you have?"*
 
-`install.sh` backs up any existing `~/.copilot/copilot-instructions.md` and
-matching agent files to `~/.copilot/.backup-<timestamp>-<pid>/` before overwriting, so
-it's safe to re-run.
+> **NOTE — your existing `copilot-instructions.md` is preserved.** The installer
+> merges the playbook in as a **marker-delimited managed block**; anything you wrote
+> yourself stays put. Re-running `./install.sh` upgrades that block in place
+> (idempotent), and `./uninstall.sh` strips just the block, leaving your own
+> instructions behind. The file is also backed up to
+> `~/.copilot/.backup-<timestamp>-<pid>/` as a safety net.
 
-Re-running `./install.sh` upgrades in place: it stamps the installed version,
-prints a `version -> version` change summary (added / updated / unchanged /
-removed per agent), and prunes any agents that were removed or renamed in a
-newer version. Unrelated `local-*` agents you installed yourself are never
-touched — only agents recorded in this repo's install manifest are pruned.
+Re-running `./install.sh` is a versioned, in-place upgrade: it prints a
+`version -> version` change summary (added / updated / unchanged / removed agents)
+and prunes agents earlier versions shipped but this one no longer does. Unrelated
+`local-*` agents you installed yourself are never touched.
 
 `install.sh` and `uninstall.sh` honor a `$COPILOT_HOME` environment variable if your
 Copilot CLI keeps its config somewhere other than the default `~/.copilot`.
 
-## Try this first
+### Manual copy (fallback)
 
-After installing, open a `copilot` session in any git repo and ask for something small:
-
-> "Add input validation to function `foo` in `src/…` and write a test for it."
-
-You should see the lead agent classify the task, delegate to `local-developer`, then
-fan out a reviewer or two plus `local-qa-tester`, and summarize what it found. For a
-bigger ask ("refactor module X to support Y") it runs the full pipeline, starting with
-an architect design doc it shows you for approval. If you're not sure it loaded, ask:
-*"what agents do you have?"*
-
-For a sense of what the team's artifacts look like before you run it, see
-[`examples/`](examples/) — a sample architect design doc and the matching review
-synthesis for one small change (illustrative, not actual run output).
-
-### Already have a `copilot-instructions.md`?
-
-The installer replaces it (after backing it up). To keep your own instructions, open the
-backup at `~/.copilot/.backup-<timestamp>-<pid>/copilot-instructions.md`, copy everything
-from the `# Multi-agent team playbook` heading to the end of this repo's
-`copilot-instructions.md`, and paste it into your file (top or bottom — the lead reads
-the whole file; order matters only if sections directly conflict).
-
-## Model diversity — why it matters and what breaks if you change it
-
-The reviewers are spread across **three model families on purpose**:
-
-| Role | Model family | Why |
-|---|---|---|
-| Architect, Developer | Claude | Cooperative design → build handoff |
-| Code + Critical reviewers | GPT | Cross-family adversarial review of Claude-written code |
-| Deep reviewer | Claude (Opus) | Spec/math tie-breaker |
-| Integration reviewer | Gemini | Third blind-spot set, large context for whole-repo review |
-| Readability reviewer | Claude | Fresh-reader clarity lens |
-
-Different model families have different blind spots. Reviewing Claude-written code
-with GPT and Gemini catches things a same-family reviewer misses. If you swap
-models, keep developer and the adversarial reviewers in **different** families.
-
-The model ID for each agent lives in one place: the `model:` line in that
-agent's `agents/local-*.agent.md` frontmatter (the single source of truth).
-Adjust it to whatever your Copilot CLI account has access to — if a referenced
-model isn't available to you, point that agent at one that is.
-
-### Customizing models
-
-For a permanent change, edit the `model:` line in the relevant
-`agents/local-*.agent.md` and run `./install.sh`.
-
-To override models **without editing the repo** (handy for forks, experiments, or
-pinning a whole org to one model), give `install.sh` an override file. It is
-applied only to the copies written into `~/.copilot/`; your repo files are never
-touched:
+No installer? Copy the pieces by hand:
 
 ```bash
-cat > models.override <<'EOF'
-# one "agent-name model-id" per line; '*' sets the default for every agent
-local-code-reviewer  gpt-5.4
-*                    claude-opus-4.8   # pin everyone else to one model
-EOF
-./install.sh                                   # picks up ./models.override
-# or point at a file anywhere:
-COPILOT_REVIEW_TEAM_MODEL_OVERRIDE=/path/to/models.override ./install.sh
+mkdir -p ~/.copilot/agents
+cp agents/local-*.agent.md ~/.copilot/agents/
+# then paste this repo's copilot-instructions.md into
+# ~/.copilot/copilot-instructions.md (append it; keep anything already there)
 ```
-
-An explicit per-agent entry wins over the `*` wildcard. Blank lines, full-line
-`#` comments, and trailing inline `#` comments (as shown above) are ignored. A
-malformed override, or one that names an agent that doesn't exist, fails the
-install rather than silently doing nothing. The prettified family names in the
-prose (e.g. "Claude Opus 4.8") are a manual concern — overrides only touch the
-machine-readable `model:` line.
 
 To remove the team later, run [`./uninstall.sh`](uninstall.sh) — it removes only
 the agent files this repo installed (your other `local-*` agents are left alone)
-and restores your previous `copilot-instructions.md` from the install backup.
+and strips the playbook's managed block. Use `--purge-playbook` to drop the whole
+`copilot-instructions.md` instead (it asks first).
 
-## How it behaves
+## Customization
 
-The playbook matches effort to task size:
+The model for each agent lives in one place: the `model:` line in that agent's
+`agents/local-*.agent.md` frontmatter. To change models:
 
-- **Trivial** (typo, one-liner): the lead just does it, no team.
-- **Small**: developer + one reviewer + QA.
-- **Non-trivial / multi-file**: full pipeline — architect, developer, parallel
-  review fan-out, synthesize findings, loop back to the developer (max 2 rounds),
-  then docs.
+```bash
+# edit the model: line in the agent(s) you want to retarget, e.g.
+#   model: gpt-5.5   ->   model: gpt-5.4
+$EDITOR agents/local-critical-reviewer.agent.md
+./install.sh        # re-run to push the change into ~/.copilot/
+```
 
-You can always override: say *"just do it"*, *"skip the team"*, or
-*"have the QA tester run the tests"* to short-circuit it.
-
-For PR reviews, ask the lead to **"review &lt;PR url&gt;"** and it runs a review-only
-pipeline (five reviewers in parallel, synthesized by severity) without touching code.
-The QA tester is deliberately excluded from this pass — it verifies behavior by *running*
-your code, which a review-only pass (static review, no execution) does not do.
+If a referenced model isn't available to your account, point that agent at one that
+is. When swapping, keep the adversarial reviewers across **different** families —
+that cross-family spread is where most of the review value comes from.
 
 ## Per-repo install (optional)
 
@@ -209,42 +217,16 @@ instructions layer on top of (and win over) your global ones.
 ## Notes
 
 - **No extra servers, but your code does go to model providers.** This repo adds no
-  server or external service of its own — but the workflow is built on Copilot CLI, which
-  sends your prompts, diffs, and code context to hosted model providers per your Copilot
-  plan. A full review fan-out sends the same diff to several model families. Don't treat
-  it as an air-gapped/local-only setup; for sensitive code, narrow the pipeline (e.g.
-  fewer reviewers) accordingly.
-- **Cost & latency scale with the pipeline.** A non-trivial task can fan out to architect
-  + developer + 5 reviewers + QA, possibly a second loop, then docs — i.e. many premium
-  model calls per change, multiplied by diff size. The "match depth to task size" guidance
-  in the playbook keeps this in check; lean on *"just do it"* / *"skip the team"* for small
-  work.
+  server of its own — but Copilot CLI sends your prompts, diffs, and code context to
+  hosted model providers per your Copilot plan. A full review fan-out sends the same
+  diff to several model families. Don't treat it as an air-gapped/local-only setup;
+  for sensitive code, narrow the fan-out (fewer reviewers) accordingly.
+- **Cost & latency scale with the fan-out.** A full review can hit five reviewers
+  (plus a QA pass and a second loop) — many premium model calls per change,
+  multiplied by diff size. The "match depth to task size" guidance keeps this in
+  check.
 - Tested with Copilot CLI. Requires an account with access to the referenced
   models (swap as needed).
-
-## Known limitations
-
-Documented, accepted trade-offs for the single-user install this tool targets — not open
-action items. See the linked issues for detail.
-
-- **`install.sh` backup→remove is not atomic (a TOCTOU-style race).**
-  ([#4](https://github.com/titaiwangms/copilot-review-team/issues/4)) When replacing a
-  symlink or pruning an orphaned agent, the installer backs the file up and then removes
-  it as two separate steps. A process racing in between could leave the removed bytes
-  differing from the backed-up bytes. The window is theoretical under the intended
-  single-user use — the installer isn't meant to run concurrently with itself — and is
-  empirically safe in testing. A `flock` lockfile under `$COPILOT_DIR` would close it if
-  multi-user installs ever become a use case.
-- **Install manifest is trusted by name.**
-  ([#5](https://github.com/titaiwangms/copilot-review-team/issues/5)) Upgrades prune
-  agents recorded in `~/.copilot/.copilot-review-team-manifest`. Path-traversal names are
-  already rejected, but a *validly-named* foreign agent hand-injected into the manifest
-  would be pruned on the next upgrade. This requires the user to tamper with their own
-  manifest, so the practical risk is near-zero. The prune is also reversible: agents are
-  `backup()`'d to `~/.copilot/.backup-<timestamp>-<pid>/` before removal, so an erroneous
-  prune can be restored rather than lost. Recording per-agent ownership (a content hash
-  and/or installer marker) and only pruning entries this installer actually wrote would
-  harden it further.
 
 ## License
 
