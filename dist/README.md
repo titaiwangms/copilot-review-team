@@ -58,14 +58,14 @@ bundle's own header — this README summarizes it to avoid drift.)
   extracted copy of a non-newline-terminated source would pick up one extra
   trailing newline.
 - **The bundle embeds the repo `VERSION`**, so a version-only bump requires
-  regenerating the bundle — CI check **C9** enforces this.
+  regenerating the bundle — CI check **C8** enforces this.
 
 ### How it stays in sync
 
 The bundle is produced by [`scripts/build-bundle.sh`](../scripts/build-bundle.sh)
 directly from `agents/local-*.agent.md` and `copilot-instructions.md`. It *can*
 drift if a source changes and the bundle isn't regenerated — which is exactly
-what CI check **C9** guards against: it fails the build whenever the committed
+what CI check **C8** guards against: it fails the build whenever the committed
 bundle no longer matches a fresh generation, so drift is caught rather than
 shipped.
 
@@ -76,6 +76,6 @@ scripts/build-bundle.sh --stdout   # print without writing a file
 ```
 
 Generation is deterministic (sorted inputs, no timestamps). CI enforces sync via
-check **C9** in [`scripts/validate.sh`](../scripts/validate.sh): if you change an
+check **C8** in [`scripts/validate.sh`](../scripts/validate.sh): if you change an
 agent, the playbook, or the `VERSION` file, regenerate the bundle in the same
 commit or the check fails.

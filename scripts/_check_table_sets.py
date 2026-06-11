@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""C3 (supplement): the set of agent names in the copilot-instructions.md
-table equals the set of agent files. set-models.sh --check already compares
-the per-agent model values; this asserts there are no extra or missing rows.
+"""The set of agent names in the copilot-instructions.md team table equals the
+set of agent files — no extra or missing rows. Model IDs live solely in the
+agent frontmatter (single source of truth), so this check is purely about the
+table's agent roster, not model values.
 """
 import os
 import re

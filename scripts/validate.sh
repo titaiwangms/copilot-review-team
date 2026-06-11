@@ -15,14 +15,14 @@ FAILURES=0
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*"; FAILURES=$((FAILURES + 1)); }
 
-SCRIPTS="install.sh uninstall.sh set-models.sh scripts/validate.sh scripts/build-bundle.sh"
+SCRIPTS="install.sh uninstall.sh scripts/validate.sh scripts/build-bundle.sh"
 
 # --- prerequisite: python3 ---
 echo "== prerequisites =="
 if command -v python3 >/dev/null 2>&1; then
   pass "python3 available"
 else
-  fail "python3 not found on PATH — required by set-models.sh and these checks"
+  fail "python3 not found on PATH — required by these checks"
   echo ""
   echo "Cannot continue without python3."
   exit 1
@@ -45,34 +45,34 @@ if python3 scripts/_check_frontmatter.py; then
 else
   fail "agent frontmatter check"
 fi
-
-# --- C3: model drift (single source of truth: set-models.sh --check) ---
-echo "== C3: model drift =="
-if ./set-models.sh --check; then
-  pass "frontmatter == table (set-models.sh --check)"
+# Run the frontmatter checker's own unit tests so CI exercises the validation
+# logic (malformed / empty / list / block-scalar model values), not just the
+# happy path. Capture output so a PASS stays quiet but a FAILURE shows which
+# cases broke.
+if frontmatter_test_output="$(python3 scripts/_test_check_frontmatter.py 2>&1)"; then
+  pass "frontmatter checker unit tests (scripts/_test_check_frontmatter.py)"
 else
-  fail "model drift detected (set-models.sh --check)"
+  fail "frontmatter checker unit tests"
+  printf '%s\n' "$frontmatter_test_output"
 fi
+
+# --- C3: team table roster matches agent files ---
+# Model IDs are single-source in each agent's frontmatter; there is no model
+# sync to police. We still assert the playbook team table lists exactly the
+# agents that exist on disk (no stale or missing rows).
+echo "== C3: team table roster =="
 if python3 scripts/_check_table_sets.py; then
   pass "table agent set == agent file set"
 else
   fail "table agent set != agent file set"
 fi
 
-# --- C4: models.conf consistency ---
-echo "== C4: models.conf =="
-if python3 scripts/_check_models_conf.py; then
-  pass "models.conf matches frontmatter"
-else
-  fail "models.conf inconsistent with frontmatter"
-fi
-
-# --- C5: reviewer-count phrasing (fork-friendly) ---
+# --- C4: reviewer-count phrasing (fork-friendly) ---
 # Derive the reviewer count N from the actual files rather than hard-coding 5,
 # so a fork that adds/removes a reviewer still passes as long as it is
 # internally consistent. We then assert every reviewer body and every count
 # phrasing in the docs agrees with N.
-echo "== C5: reviewer count phrasing =="
+echo "== C4: reviewer count phrasing =="
 reviewer_count="$(find agents -name 'local-*-reviewer.agent.md' | wc -l | tr -d ' ')"
 if [ "$reviewer_count" -ge 1 ]; then
   pass "found $reviewer_count reviewer agent file(s)"
@@ -126,8 +126,8 @@ for f in $stale_scan_files; do
   fi
 done
 
-# --- C6: shellcheck (opt-in) ---
-echo "== C6: shellcheck (optional) =="
+# --- C5: shellcheck (opt-in) ---
+echo "== C5: shellcheck (optional) =="
 if command -v shellcheck >/dev/null 2>&1; then
   # shellcheck disable=SC2086
   if shellcheck $SCRIPTS; then
@@ -139,16 +139,16 @@ else
   echo "  SKIP: shellcheck not installed"
 fi
 
-# --- C7: tool privileges (least privilege) ---
-echo "== C7: tool privileges =="
+# --- C6: tool privileges (least privilege) ---
+echo "== C6: tool privileges =="
 if python3 scripts/_check_tools.py; then
   pass "agent tool grants satisfy least-privilege rules"
 else
   fail "tool privilege check (scripts/_check_tools.py)"
 fi
 
-# --- C8: VERSION file present and well-formed ---
-echo "== C8: VERSION file =="
+# --- C7: VERSION file present and well-formed ---
+echo "== C7: VERSION file =="
 if [ -s VERSION ]; then
   version_str="$(tr -d '[:space:]' < VERSION)"
   if printf '%s' "$version_str" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -160,13 +160,13 @@ else
   fail "VERSION file missing or empty"
 fi
 
-# --- C9: zero-tooling bundle in sync ---
+# --- C8: zero-tooling bundle in sync ---
 # The committed paste-able bundle (dist/copilot-review-team-bundle.md) is a
 # generated artifact. It must be regenerated whenever an agent definition, the
 # playbook, or the VERSION file changes (the bundle embeds VERSION), or
 # zero-tooling adopters get stale content. Enforce that the committed bundle
 # matches a fresh generation from the current sources.
-echo "== C9: zero-tooling bundle drift =="
+echo "== C8: zero-tooling bundle drift =="
 # Capture output so a PASS stays quiet but a FAILURE shows WHAT drifted (the
 # generator prints a unified diff of committed-vs-fresh on stderr). Using
 # `if ! out=$(...)` keeps this safe under `set -e`.

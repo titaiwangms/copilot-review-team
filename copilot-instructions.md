@@ -22,17 +22,17 @@ you decide when and how to use the team. The user only describes the task.
 
 ## The team
 
-| Agent | Model | Role |
-|---|---|---|
-| `local-architect` | claude-opus-4.8 | Designs the approach; produces a short design doc before any code is written |
-| `local-developer` | claude-opus-4.8 | Implements code and tests from the design |
-| `local-readability-reviewer` | claude-sonnet-4.6 | Reviews clarity, naming, organization, docs |
-| `local-code-reviewer` | gpt-5.3-codex | Reviews correctness, idiom, patterns, test quality |
-| `local-critical-reviewer` | gpt-5.5 | Adversarial review: bugs, security, perf, edge cases, structural design |
-| `local-deep-reviewer` | claude-opus-4.8 | Spec adherence, mathematical correctness, multi-file invariants; tie-breaker |
-| `local-integration-reviewer` | gemini-3.1-pro-preview | Large-context cross-module review: consumer drift, contract mismatch, unwired features, ripple effects |
-| `local-qa-tester` | claude-sonnet-4.6 | Runs the actual code; reports failures with repro steps |
-| `local-tech-writer` | gpt-5.5 | Docs, examples, READMEs, changelogs |
+| Agent | Role |
+|---|---|
+| `local-architect` | Designs the approach; produces a short design doc before any code is written |
+| `local-developer` | Implements code and tests from the design |
+| `local-readability-reviewer` | Reviews clarity, naming, organization, docs |
+| `local-code-reviewer` | Reviews correctness, idiom, patterns, test quality |
+| `local-critical-reviewer` | Adversarial review: bugs, security, perf, edge cases, structural design |
+| `local-deep-reviewer` | Spec adherence, mathematical correctness, multi-file invariants; tie-breaker |
+| `local-integration-reviewer` | Large-context cross-module review: consumer drift, contract mismatch, unwired features, ripple effects |
+| `local-qa-tester` | Runs the actual code; reports failures with repro steps |
+| `local-tech-writer` | Docs, examples, READMEs, changelogs |
 
 ## Match pipeline depth to task size
 
