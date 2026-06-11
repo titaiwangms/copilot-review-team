@@ -45,6 +45,16 @@ if python3 scripts/_check_frontmatter.py; then
 else
   fail "agent frontmatter check"
 fi
+# Run the frontmatter checker's own unit tests so CI exercises the validation
+# logic (malformed / empty / list / block-scalar model values), not just the
+# happy path. Capture output so a PASS stays quiet but a FAILURE shows which
+# cases broke.
+if frontmatter_test_output="$(python3 scripts/_test_check_frontmatter.py 2>&1)"; then
+  pass "frontmatter checker unit tests (scripts/_test_check_frontmatter.py)"
+else
+  fail "frontmatter checker unit tests"
+  printf '%s\n' "$frontmatter_test_output"
+fi
 
 # --- C3: team table roster matches agent files ---
 # Model IDs are single-source in each agent's frontmatter; there is no model

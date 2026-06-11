@@ -34,7 +34,7 @@
 #     The generator still emits a correct END marker for a file lacking a trailing
 #     newline, but a hand-extracted copy would then gain one trailing newline.
 #   - The bundle embeds the repo VERSION, so a version-only bump (editing VERSION)
-#     changes the bundle and requires regenerating it. CI check C9 enforces this.
+#     changes the bundle and requires regenerating it. CI check C8 enforces this.
 # --- end usage ---
 
 set -euo pipefail
@@ -81,7 +81,7 @@ VERSION="$(tr -d '[:space:]' < VERSION 2>/dev/null || true)"
 
 # Collect the source files in a stable, deterministic order: agents sorted by
 # name (locale-pinned with LC_ALL=C so ordering is stable across machines and
-# can't make C9 report a false 'stale' on a future punctuated filename), then
+# can't make C8 report a false 'stale' on a future punctuated filename), then
 # the playbook last.
 AGENT_FILES=()
 while IFS= read -r f; do
