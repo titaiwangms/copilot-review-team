@@ -54,19 +54,16 @@ examples/                     Illustrative design-doc + review-synthesis samples
 > build bolted on. Use the whole pipeline, or just the review half (see
 > ["How it behaves"](#how-it-behaves)).
 >
-> **Agents + playbook ship together.** The agent files define *who* is on the team; the
-> `copilot-instructions.md` playbook tells the lead agent *when* and *how* to fan them
-> out. Install both for the full workflow.
+> **Agents + playbook are both required.** The agent files define *who* is on the
+> team; the `copilot-instructions.md` playbook tells the lead agent *when* and *how*
+> to fan them out. The agents are inert without it — installing only the agents won't
+> reproduce the workflow, so install both.
 
 > **No-install option.** Don't want to clone the repo or run `install.sh`? The
 > [`dist/copilot-review-team-bundle.md`](dist/copilot-review-team-bundle.md)
 > file bundles every agent + the playbook into one paste-able document — drop it
 > into an AI session or split it into `~/.copilot/` by hand. See
 > [`dist/README.md`](dist/README.md) for usage.
-
-> **Both pieces are required.** The agents are inert without the playbook —
-> `copilot-instructions.md` is what tells the lead agent *when* and *how* to fan
-> them out. Installing only the agents won't reproduce the workflow.
 
 The `local-` prefix is just a namespace convention to mark these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you

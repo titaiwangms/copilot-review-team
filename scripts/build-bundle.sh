@@ -61,7 +61,7 @@ case "${1:-}" in
     # Print the leading comment block (after the shebang) up to the
     # `# --- end usage ---` sentinel, stripping the `# ` comment prefix.
     # Content-anchored to the sentinel so it never depends on line numbers,
-    # matching the convention in set-models.sh / uninstall.sh.
+    # matching the convention in uninstall.sh.
     awk '
       NR == 1 { next }
       /^# --- end usage ---$/ { exit }
