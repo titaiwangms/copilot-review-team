@@ -201,6 +201,22 @@ If a referenced model isn't available to your account, point that agent at one t
 is. When swapping, keep the adversarial reviewers across **different** families —
 that cross-family spread is where most of the review value comes from.
 
+### Tracking agent changes
+
+There's no changelog to maintain — git history *is* the per-agent evolution log.
+Each agent is a single self-contained file, so its full history is one command away:
+
+```bash
+# how one agent's prompt evolved, line by line, over time
+git log --follow -p agents/local-critical-reviewer.agent.md
+
+# just the commits that touched any agent
+git log --oneline -- agents/
+```
+
+On GitHub, the **History** button on any `agents/local-*.agent.md` file shows the
+same thing in the browser, and **Blame** shows which commit last changed each line.
+
 ## Per-repo install (optional)
 
 Copilot CLI also reads a repo's `.github/copilot-instructions.md` and repo-local
