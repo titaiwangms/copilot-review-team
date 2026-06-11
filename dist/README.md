@@ -34,11 +34,15 @@ Two options, both tooling-free (full instructions are in the bundle header):
    (`~/.copilot/copilot-instructions.md`) are required — the agents are inert
    without it.
 
-   **Safety — path confinement.** Every legitimate target path is under
-   `.copilot/`. When recreating files, ignore any block whose target path
-   contains `..`, a leading `/`, or a leading `~`, or that does not start with
-   `.copilot/`. The committed bundle is clean, but this keeps extraction safe if
-   a bundle is ever tampered with.
+   **Safety — only apply bundles you trust.** Every legitimate target path is
+   under `.copilot/`, but this is **documented guidance, not a mechanical
+   guarantee** — nothing in the bundle or the extractor validates paths, so a
+   tampered or third-party-modified bundle could carry a path that escapes the
+   intended tree (e.g. `.copilot/agents/../../.ssh/authorized_keys`). The bundle
+   committed in this repo is clean and safe to apply. For any bundle you did not
+   generate yourself, treat it as untrusted: inspect it first, and ignore any
+   block whose target path contains `..`, a leading `/`, or a leading `~`, or
+   that does not start with `.copilot/`.
 
 We use textual sentinels rather than Markdown code fences because the agent
 files and playbook contain their own ```` ``` ```` fences; nested fencing would
@@ -59,8 +63,11 @@ bundle's own header — this README summarizes it to avoid drift.)
 ### How it stays in sync
 
 The bundle is produced by [`scripts/build-bundle.sh`](../scripts/build-bundle.sh)
-directly from `agents/local-*.agent.md` and `copilot-instructions.md`, so it
-never drifts from the real sources.
+directly from `agents/local-*.agent.md` and `copilot-instructions.md`. It *can*
+drift if a source changes and the bundle isn't regenerated — which is exactly
+what CI check **C9** guards against: it fails the build whenever the committed
+bundle no longer matches a fresh generation, so drift is caught rather than
+shipped.
 
 ```bash
 scripts/build-bundle.sh            # (re)write this bundle
