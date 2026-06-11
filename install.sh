@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
 #
-# Installs the Copilot CLI Review + Build Team into ~/.copilot/
+# Installs the Copilot CLI Review Team into ~/.copilot/
 #
 #   - Copies the local-* agent definitions into ~/.copilot/agents/
-#   - Installs the orchestration playbook as ~/.copilot/copilot-instructions.md
+#   - Merges the orchestration playbook into ~/.copilot/copilot-instructions.md
+#     as a marker-delimited managed block (your own instructions are preserved)
 #
-# Existing files are backed up to ~/.copilot/.backup-<timestamp>-<pid>/ before being
-# overwritten, so this is safe to re-run.
+# Existing agent files are backed up to ~/.copilot/.backup-<timestamp>-<pid>/
+# before being overwritten, so this is safe to re-run.
 #
 # A manifest is written to ~/.copilot/.copilot-review-team-manifest recording
-# the exact agent basenames installed, the version installed, and the backup
-# that holds the user's ORIGINAL pre-install copilot-instructions.md (if any).
-# uninstall.sh uses it for a precise, clean removal. The original-playbook
-# pointer is set only on first install (or when the live playbook differs from
-# this repo's), so re-running install never clobbers the pointer to the user's
-# true original.
+# the exact agent basenames installed and the version installed. uninstall.sh
+# uses it for a precise, clean removal.
 #
 # Re-running install is a versioned, in-place upgrade: it prints a
 # version->version change summary (added / updated / unchanged / removed agents)
@@ -23,12 +20,8 @@
 # globbing ~/.copilot/agents/), so unrelated local-* agents are left untouched.
 #
 # Model selection: each agent's model lives in its own frontmatter `model:` line
-# (the single source of truth). To override models at install time WITHOUT
-# editing the repo, point COPILOT_REVIEW_TEAM_MODEL_OVERRIDE at a file (or drop a
-# ./models.override next to this script). Format: `agent-name model-id` per line,
-# plus an optional `*  model-id` wildcard to pin every agent to one model. The
-# override is applied only to the copies written into ~/.copilot; the repo files
-# are never touched.
+# (the single source of truth). To use different models, edit that line and
+# re-run this installer.
 
 set -euo pipefail
 
@@ -66,7 +59,7 @@ if [ -e "$MANIFEST" ]; then
   done < <(grep '^AGENT=' "$MANIFEST" 2>/dev/null | cut -d= -f2- || true)
 fi
 
-echo "Installing Copilot Review + Build Team into: $COPILOT_DIR"
+echo "Installing Copilot Review Team into: $COPILOT_DIR"
 
 if ! command -v copilot >/dev/null 2>&1; then
   echo "  WARNING: 'copilot' CLI not found on PATH. Files will still be installed, but"
@@ -119,39 +112,10 @@ install_file() {
   mv -T "$tmp" "$target"
 }
 
-# --- Optional model override (install-time only; never edits the repo) ---
-# Resolve the override source: an explicit COPILOT_REVIEW_TEAM_MODEL_OVERRIDE file wins;
-# otherwise an optional ./models.override beside this script is used if present.
-# When active, we stage the agent files into a temp dir with the override
-# applied and install FROM that staging dir, so the repo's agents/ are untouched
-# and the added/updated/unchanged classification stays accurate and idempotent.
+# --- Agent source directory ---
+# Agents are installed straight from this repo's agents/ directory; each agent's
+# model is the `model:` line in its own frontmatter (the single source of truth).
 AGENT_SRC_DIR="$SRC_DIR/agents"
-STAGE_DIR=""
-cleanup_stage() { [ -n "$STAGE_DIR" ] && rm -rf "$STAGE_DIR"; }
-trap cleanup_stage EXIT
-
-OVERRIDE_FILE=""
-if [ -n "${COPILOT_REVIEW_TEAM_MODEL_OVERRIDE:-}" ]; then
-  OVERRIDE_FILE="$COPILOT_REVIEW_TEAM_MODEL_OVERRIDE"
-  if [ ! -e "$OVERRIDE_FILE" ]; then
-    echo "error: COPILOT_REVIEW_TEAM_MODEL_OVERRIDE points to a missing file: $OVERRIDE_FILE" >&2
-    exit 1
-  fi
-elif [ -e "$SRC_DIR/models.override" ]; then
-  OVERRIDE_FILE="$SRC_DIR/models.override"
-fi
-
-if [ -n "$OVERRIDE_FILE" ]; then
-  if ! command -v python3 >/dev/null 2>&1; then
-    echo "error: python3 is required to apply model overrides but was not found on PATH" >&2
-    exit 1
-  fi
-  STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/copilot-review-team-stage.XXXXXX")"
-  echo "  model override: $OVERRIDE_FILE"
-  OVERRIDE_FILE="$OVERRIDE_FILE" SRC_AGENTS="$SRC_DIR/agents" STAGE_DIR="$STAGE_DIR" \
-    python3 "$SRC_DIR/scripts/_apply_overrides.py"
-  AGENT_SRC_DIR="$STAGE_DIR"
-fi
 
 # --- Agents ---
 # Classify each agent this version ships by its on-disk effect, then copy it.
@@ -215,31 +179,17 @@ if [ "${#PREV_AGENTS[@]}" -gt 0 ]; then
 fi
 
 # --- Playbook ---
-# If you already have a copilot-instructions.md, we DON'T clobber it silently:
-# it is backed up first, then replaced. Merge by hand afterward if needed.
+# We DON'T clobber an existing copilot-instructions.md: the playbook is merged in
+# as a marker-delimited managed block, so any instructions you wrote yourself are
+# preserved. We still back the file up first as a safety net.
 PLAYBOOK="$COPILOT_DIR/copilot-instructions.md"
 
-# Decide which backup holds the user's ORIGINAL (pre-install) playbook. This is
-# computed BEFORE we back up / overwrite the live file.
-#   - If a manifest already exists, preserve whatever it recorded (never point
-#     it at this repo's own playbook on a re-install).
-#   - Otherwise (first install): the original is the live playbook only if it
-#     exists and is NOT byte-identical to this repo's copy; else there is no
-#     real original to preserve (empty pointer).
-if [ -e "$MANIFEST" ]; then
-  ORIG_PLAYBOOK_BACKUP="$(grep '^ORIGINAL_PLAYBOOK_BACKUP=' "$MANIFEST" 2>/dev/null | head -1 | cut -d= -f2- || true)"
-elif [ -e "$PLAYBOOK" ] && ! cmp -s "$PLAYBOOK" "$SRC_DIR/copilot-instructions.md"; then
-  ORIG_PLAYBOOK_BACKUP="$BACKUP_DIR/copilot-instructions.md"
-else
-  ORIG_PLAYBOOK_BACKUP=""
-fi
-
 if [ -e "$PLAYBOOK" ]; then
-  echo "  NOTE:    existing copilot-instructions.md found — backing it up."
+  echo "  NOTE: existing copilot-instructions.md found — backing it up."
 fi
-backup "$PLAYBOOK"
-cp "$SRC_DIR/copilot-instructions.md" "$PLAYBOOK"
-echo "  playbook: copilot-instructions.md"
+backup "$PLAYBOOK"   # safety net retained
+python3 "$SRC_DIR/scripts/_merge_playbook.py" install "$PLAYBOOK" "$SRC_DIR/copilot-instructions.md"
+echo "  playbook: merged managed block into copilot-instructions.md"
 
 # --- Manifest ---
 # Record exactly what we installed so uninstall.sh can clean up precisely.
@@ -247,7 +197,6 @@ echo "  playbook: copilot-instructions.md"
   echo "# Manifest written by install.sh; read by uninstall.sh. Do not edit by hand."
   echo "VERSION=$NEW_VERSION"
   echo "INSTALLED_AT=$TIMESTAMP"
-  echo "ORIGINAL_PLAYBOOK_BACKUP=$ORIG_PLAYBOOK_BACKUP"
   for f in "$AGENT_SRC_DIR"/local-*.agent.md; do
     echo "AGENT=$(basename "$f")"
   done

@@ -55,6 +55,16 @@ else
   fail "frontmatter checker unit tests"
   printf '%s\n' "$frontmatter_test_output"
 fi
+# Run the playbook-merge helper's unit tests so CI exercises the install/remove
+# marker-block logic (new file, append, in-place upgrade, collapse, unbalanced
+# abort, remove). Capture output so a PASS stays quiet but a FAILURE shows which
+# cases broke.
+if merge_test_output="$(python3 scripts/_test_merge_playbook.py 2>&1)"; then
+  pass "playbook merge unit tests (scripts/_test_merge_playbook.py)"
+else
+  fail "playbook merge unit tests"
+  printf '%s\n' "$merge_test_output"
+fi
 
 # --- C3: team table roster matches agent files ---
 # Model IDs are single-source in each agent's frontmatter; there is no model
