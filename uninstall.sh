@@ -18,6 +18,8 @@
 #   -h, --help           show this help
 #
 # Backup directories (~/.copilot/.backup-*/) are never deleted.
+#
+# --- end usage ---
 
 set -euo pipefail
 
@@ -31,7 +33,15 @@ DRY_RUN=0
 PLAYBOOK_ACTION="restore"
 
 usage() {
-  sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # Print the leading comment block (after the shebang) up to the
+  # `# --- end usage ---` sentinel, stripping the `# ` comment prefix.
+  # Content-anchored to the sentinel so it never depends on line numbers.
+  awk '
+    NR == 1 { next }
+    /^# --- end usage ---$/ { exit }
+    /^#/ { sub(/^# ?/, ""); print; next }
+    { exit }
+  ' "${BASH_SOURCE[0]}"
 }
 
 while [ $# -gt 0 ]; do
