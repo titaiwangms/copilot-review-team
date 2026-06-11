@@ -33,6 +33,10 @@ class MergePlaybookTest(unittest.TestCase):
         with open(self.target, "w", encoding="utf-8") as fh:
             fh.write(text)
 
+    def write_target_bytes(self, data):
+        with open(self.target, "wb") as fh:
+            fh.write(data)
+
     def block(self):
         return mp.BEGIN + "\n" + SOURCE.strip("\n") + "\n" + mp.END + "\n"
 
@@ -126,6 +130,57 @@ class MergePlaybookTest(unittest.TestCase):
         rc = mp.main(["_merge_playbook.py", "remove", self.target])
         self.assertEqual(rc, 1)
         self.assertEqual(self.read_target(), bad)
+
+    # --- fidelity / byte round-trip (M1, M2, m5) ---
+
+    def read_target_bytes(self):
+        with open(self.target, "rb") as fh:
+            return fh.read()
+
+    def test_crlf_file_stays_crlf_through_install_and_remove(self):
+        # A user file with Windows (CRLF) line endings must keep them.
+        self.write_target_bytes(b"my notes\r\nsecond line\r\n")
+        mp.cmd_install(self.target, self.source)
+        after_install = self.read_target_bytes()
+        self.assertIn(b"\r\n", after_install)
+        # No bare LF (every \n must be preceded by \r).
+        self.assertEqual(after_install.count(b"\n"), after_install.count(b"\r\n"))
+        mp.cmd_remove(self.target)
+        after_remove = self.read_target_bytes()
+        self.assertEqual(after_remove, b"my notes\r\nsecond line\r\n")
+
+    def test_install_then_remove_preserves_multiple_trailing_blank_lines(self):
+        original = b"alpha\nbeta\n\n\n"
+        self.write_target_bytes(original)
+        mp.cmd_install(self.target, self.source)
+        mp.cmd_remove(self.target)
+        self.assertEqual(self.read_target_bytes(), original)
+
+    def test_install_preserves_trailing_spaces_on_content_line(self):
+        # A Markdown hard-break ('keep  ') must not lose its trailing spaces.
+        self.write_target_bytes(b"keep  \nnext\n")
+        mp.cmd_install(self.target, self.source)
+        after = self.read_target_bytes()
+        self.assertIn(b"keep  \n", after)
+        mp.cmd_remove(self.target)
+        self.assertEqual(self.read_target_bytes(), b"keep  \nnext\n")
+
+    def test_install_then_remove_no_prior_block_is_byte_identical(self):
+        original = b"just my notes\nwith two lines\n"
+        self.write_target_bytes(original)
+        mp.cmd_install(self.target, self.source)
+        mp.cmd_remove(self.target)
+        self.assertEqual(self.read_target_bytes(), original)
+
+    def test_install_rejects_marker_in_source(self):
+        bad_source = os.path.join(self.dir, "bad_source.md")
+        with open(bad_source, "w", encoding="utf-8") as fh:
+            fh.write("legit line\n" + mp.BEGIN + "\nsneaky\n")
+        self.write_target("user content\n")
+        rc = mp.cmd_install(self.target, bad_source)
+        self.assertEqual(rc, 1)
+        # Target must be untouched (no managed block written).
+        self.assertEqual(self.read_target(), "user content\n")
 
 
 if __name__ == "__main__":
