@@ -1,0 +1,12 @@
+diff --git a/app/window.py b/app/window.py
+index 9999999..aaaaaaa 100644
+--- a/app/window.py
++++ b/app/window.py
+@@ -3,6 +3,12 @@ def moving_average(values, window):
+     averages = []
+-    return averages
++    # Compute the average over each sliding window of size `window`.
++    for start in range(0, len(values)):
++        chunk = values[start:start + window]
++        averages.append(sum(chunk) / window)
++    return averages

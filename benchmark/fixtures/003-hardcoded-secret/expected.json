@@ -1,0 +1,32 @@
+{
+  "id": "003-hardcoded-secret",
+  "title": "Hardcoded live API secret committed to source",
+  "language": "python",
+  "defects": [
+    {
+      "id": "hardcoded-secret",
+      "category": "security",
+      "severity": "critical",
+      "location": "app/client.py:API_KEY",
+      "description": "A live secret key is hardcoded in source (replacing an env-var lookup), leaking the credential into version control. Should be read from the environment or a secret manager.",
+      "match_any": [
+        "hardcoded secret",
+        "hard-coded secret",
+        "hardcoded credential",
+        "hardcoded api key",
+        "hardcoded key",
+        "secret in source",
+        "committed secret",
+        "read from the environment",
+        "environment variable",
+        "secret manager",
+        "rotate the key",
+        "leaked credential"
+      ],
+      "location_tokens": [
+        "api_key",
+        "client.py"
+      ]
+    }
+  ]
+}

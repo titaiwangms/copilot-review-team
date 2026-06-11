@@ -1,0 +1,32 @@
+{
+  "id": "006-resource-leak",
+  "title": "File handle leaked when a write raises before close()",
+  "language": "python",
+  "defects": [
+    {
+      "id": "resource-leak",
+      "category": "reliability",
+      "severity": "major",
+      "location": "app/report.py:write_report",
+      "description": "The file is opened and closed manually; if format_row or write raises mid-loop, f.close() never runs and the handle leaks. Should use a `with open(...)` context manager.",
+      "match_any": [
+        "resource leak",
+        "file handle leak",
+        "leaked file handle",
+        "file descriptor leak",
+        "not closed",
+        "won't be closed",
+        "never closed",
+        "fails to close",
+        "context manager",
+        "with open",
+        "with-open",
+        "try/finally"
+      ],
+      "location_tokens": [
+        "write_report",
+        "report.py"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "009-clean-subprocess-list",
+  "title": "Near-miss control: subprocess run with an argument list (no shell)",
+  "language": "python",
+  "defects": [],
+  "note": "Runs `tar` on a user-supplied directory (looks like fixture 002) but passes an argv list with no shell=True, so there is NO command injection. Flagging 'command injection' here is a false positive. Precision near-miss."
+}

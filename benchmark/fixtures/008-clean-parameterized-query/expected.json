@@ -1,0 +1,7 @@
+{
+  "id": "008-clean-parameterized-query",
+  "title": "Near-miss control: SQL query that is correctly parameterized",
+  "language": "python",
+  "defects": [],
+  "note": "Touches SQL and user input (looks like fixture 001) but uses a bound `?` placeholder, so there is NO injection. A trigger-happy reviewer that flags 'SQL injection' here produces a false positive. Exists to measure precision against a realistic near-miss, not just an obviously-clean change."
+}

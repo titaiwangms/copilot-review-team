@@ -1,0 +1,13 @@
+diff --git a/app/export.py b/app/export.py
+index 3c4d5e6..7f8a9b0 100644
+--- a/app/export.py
++++ b/app/export.py
+@@ -4,6 +4,12 @@ def format_row(row):
+     return ",".join(str(value) for value in row)
+ 
+ 
++def export_rows(path, rows):
++    # Context manager guarantees the file is closed even if format_row raises.
++    with open(path, "w", encoding="utf-8") as handle:
++        for row in rows:
++            handle.write(format_row(row) + "\n")
