@@ -170,7 +170,7 @@ local-code-reviewer  gpt-5.4
 EOF
 ./install.sh                                   # picks up ./models.override
 # or point at a file anywhere:
-COPILOT_MODEL_OVERRIDE=/path/to/models.override ./install.sh
+COPILOT_REVIEW_TEAM_MODEL_OVERRIDE=/path/to/models.override ./install.sh
 ```
 
 An explicit per-agent entry wins over the `*` wildcard. Blank lines, full-line

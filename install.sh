@@ -24,7 +24,7 @@
 #
 # Model selection: each agent's model lives in its own frontmatter `model:` line
 # (the single source of truth). To override models at install time WITHOUT
-# editing the repo, point COPILOT_MODEL_OVERRIDE at a file (or drop a
+# editing the repo, point COPILOT_REVIEW_TEAM_MODEL_OVERRIDE at a file (or drop a
 # ./models.override next to this script). Format: `agent-name model-id` per line,
 # plus an optional `*  model-id` wildcard to pin every agent to one model. The
 # override is applied only to the copies written into ~/.copilot; the repo files
@@ -120,7 +120,7 @@ install_file() {
 }
 
 # --- Optional model override (install-time only; never edits the repo) ---
-# Resolve the override source: an explicit COPILOT_MODEL_OVERRIDE file wins;
+# Resolve the override source: an explicit COPILOT_REVIEW_TEAM_MODEL_OVERRIDE file wins;
 # otherwise an optional ./models.override beside this script is used if present.
 # When active, we stage the agent files into a temp dir with the override
 # applied and install FROM that staging dir, so the repo's agents/ are untouched
@@ -131,10 +131,10 @@ cleanup_stage() { [ -n "$STAGE_DIR" ] && rm -rf "$STAGE_DIR"; }
 trap cleanup_stage EXIT
 
 OVERRIDE_FILE=""
-if [ -n "${COPILOT_MODEL_OVERRIDE:-}" ]; then
-  OVERRIDE_FILE="$COPILOT_MODEL_OVERRIDE"
+if [ -n "${COPILOT_REVIEW_TEAM_MODEL_OVERRIDE:-}" ]; then
+  OVERRIDE_FILE="$COPILOT_REVIEW_TEAM_MODEL_OVERRIDE"
   if [ ! -e "$OVERRIDE_FILE" ]; then
-    echo "error: COPILOT_MODEL_OVERRIDE points to a missing file: $OVERRIDE_FILE" >&2
+    echo "error: COPILOT_REVIEW_TEAM_MODEL_OVERRIDE points to a missing file: $OVERRIDE_FILE" >&2
     exit 1
   fi
 elif [ -e "$SRC_DIR/models.override" ]; then

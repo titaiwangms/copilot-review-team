@@ -29,7 +29,7 @@ anything.
   the `model:` line in its own `agents/local-*.agent.md` frontmatter — the single
   source of truth. Edit it there. To override models without touching the repo
   (e.g. in a fork), use `install.sh`'s optional override file
-  (`COPILOT_MODEL_OVERRIDE` or `./models.override`); see the README.
+  (`COPILOT_REVIEW_TEAM_MODEL_OVERRIDE` or `./models.override`); see the README.
 
 - **Keep agents self-contained.** Each `local-*.agent.md` is a fresh context — don't
   assume it can see conversation state.

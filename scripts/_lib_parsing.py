@@ -133,8 +133,8 @@ def set_frontmatter_model(text, model):
 def load_overrides(path):
     """Parse an optional model-override file into a mapping.
 
-    Format: one `agent-name  model-id` per line. The separator is whitespace
-    and/or a single '=', so both of these are valid:
+    Format: one `agent-name  model-id` per line. The separator is any run of
+    whitespace and/or '=' characters, so both of these are valid:
         local-architect  gpt-5.4
         local-architect = gpt-5.4
     A wildcard line ('*') sets the model for every agent not named explicitly,
