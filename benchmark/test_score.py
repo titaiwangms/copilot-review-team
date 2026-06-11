@@ -132,6 +132,15 @@ class FalsePositiveDetectionTests(unittest.TestCase):
         review = "No lint issues. **Critical**: SQL injection"
         self.assertEqual(len(score.find_false_positive_findings(review)), 1)
 
+    def test_appended_absence_cue_does_not_hide_a_real_finding(self):
+        # A located finding must not dodge the FP count by tacking an absence cue
+        # onto a later clause; only the clause right after the severity label
+        # decides dismissal. The clean dismissal still yields 0 FP.
+        self.assertEqual(
+            len(score.find_false_positive_findings("## Critical: SQL injection in db.py; none.")), 1
+        )
+        self.assertEqual(score.find_false_positive_findings("## Critical: none found"), [])
+
     def test_no_issues_prose_is_not_flagged(self):
         review = "No major issues found. The code looks correct and well tested."
         self.assertEqual(score.find_false_positive_findings(review), [])

@@ -224,8 +224,12 @@ def find_false_positive_findings(review_text):
     for line in review_text.splitlines():
         leading = FALSE_POSITIVE_SEVERITY_RE.match(line)
         if leading:
-            rest = line[leading.end(1):]
-            if _is_negated(line.lower(), leading.start(1)) or _ABSENCE_RE.search(rest):
+            # Only the clause IMMEDIATELY after the severity label decides
+            # dismissal-vs-finding. A real located finding must not dodge the FP
+            # count by appending an absence cue in a later clause
+            # ("Critical: SQL injection in db.py; none.").
+            first_clause = _CLAUSE_BOUNDARY_RE.split(line[leading.end(1):], 1)[0]
+            if _is_negated(line.lower(), leading.start(1)) or _ABSENCE_RE.search(first_clause):
                 continue
             matches.append(line.strip())
             continue
