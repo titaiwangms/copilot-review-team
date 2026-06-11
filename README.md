@@ -44,6 +44,9 @@ set-models.sh                 Applies models.conf to the agents + playbook table
 install.sh                    Copies everything into ~/.copilot/
 uninstall.sh                  Removes this repo's agents from ~/.copilot/ (leaves others alone)
 scripts/validate.sh           Repo self-checks (run before submitting a PR; also runs in CI)
+scripts/build-bundle.sh       Generates the zero-tooling paste-able bundle from the agents + playbook
+dist/                         Generated artifacts (see dist/README.md)
+  copilot-review-team-bundle.md   Single paste-able bundle of all agents + playbook (no install needed)
 examples/                     Illustrative design-doc + review-synthesis samples
 ```
 
@@ -56,6 +59,16 @@ examples/                     Illustrative design-doc + review-synthesis samples
 > **Agents + playbook ship together.** The agent files define *who* is on the team; the
 > `copilot-instructions.md` playbook tells the lead agent *when* and *how* to fan them
 > out. Install both for the full workflow.
+
+> **No-install option.** Don't want to clone the repo or run `install.sh`? The
+> [`dist/copilot-review-team-bundle.md`](dist/copilot-review-team-bundle.md)
+> file bundles every agent + the playbook into one paste-able document — drop it
+> into an AI session or split it into `~/.copilot/` by hand. See
+> [`dist/README.md`](dist/README.md) for usage.
+
+> **Both pieces are required.** The agents are inert without the playbook —
+> `copilot-instructions.md` is what tells the lead agent *when* and *how* to fan
+> them out. Installing only the agents won't reproduce the workflow.
 
 The `local-` prefix is just a namespace convention to mark these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you
