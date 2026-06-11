@@ -117,6 +117,21 @@ class FalsePositiveDetectionTests(unittest.TestCase):
         self.assertEqual(score.find_false_positive_findings("No **critical** issues found"), [])
         self.assertEqual(score.find_false_positive_findings("There are no **major** problems here."), [])
 
+    def test_heading_led_clean_dismissal_is_not_flagged(self):
+        # Line-leading severity labels that report ABSENCE ("none found", "none")
+        # are a clean bill of health, not a false positive. This heading/bullet
+        # format is exactly what this repo's reviewers emit, so flagging it would
+        # trip the precision gate (exit 2) for a correct reviewer.
+        self.assertEqual(score.find_false_positive_findings("## Critical issues: none found"), [])
+        self.assertEqual(score.find_false_positive_findings("- Critical: none"), [])
+        self.assertEqual(score.find_false_positive_findings("## Major concerns: none"), [])
+
+    def test_unrelated_leading_negation_does_not_suppress_real_inline_finding(self):
+        # The inline negation guard must be clause-local: an unrelated "No" in an
+        # earlier sentence must not suppress a genuine inline severity finding.
+        review = "No lint issues. **Critical**: SQL injection"
+        self.assertEqual(len(score.find_false_positive_findings(review)), 1)
+
     def test_no_issues_prose_is_not_flagged(self):
         review = "No major issues found. The code looks correct and well tested."
         self.assertEqual(score.find_false_positive_findings(review), [])

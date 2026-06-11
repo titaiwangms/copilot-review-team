@@ -47,6 +47,24 @@ _NEGATION_RE = re.compile(
 )
 _NEGATION_WINDOW_CHARS = 30
 
+# Clause/sentence boundaries. A negation cue only suppresses a phrase when it sits
+# in the SAME clause as that phrase. A negation belonging to an earlier sentence
+# ("No lint issues. **Critical**: SQL injection") must not reach across the
+# boundary and wrongly suppress the later finding.
+_CLAUSE_BOUNDARY_RE = re.compile(r"[.;!?\n]")
+
+# Absence/dismissal cues. When one of these follows a line-leading severity label
+# ("## Critical issues: none found", "- Major: none") the reviewer is giving a
+# clean bill of health, not asserting a finding, so it is NOT a false positive.
+_ABSENCE_RE = re.compile(
+    r"(?i)\b("
+    r"none|nothing|not found|n/?a|all clear|"
+    r"no (?:critical|major|such|known )?"
+    r"(?:issues?|concerns?|problems?|findings?|defects?|bugs?|vulnerabilit\w+)|"
+    r"looks? (?:good|clean|fine)"
+    r")\b"
+)
+
 # A clean-control finding is treated as a false positive only when the reviewer
 # labels it at this severity or higher. Minor/Nit style suggestions on correct
 # code are expected and are NOT penalized. We match a severity label that opens a
@@ -70,8 +88,18 @@ def _split_blocks(text):
 
 
 def _is_negated(block, phrase_index):
-    """True if a negation cue sits just before the phrase at phrase_index."""
+    """True if a negation cue sits just before the phrase, within the same clause.
+
+    The lookbehind window is clipped at the last clause/sentence boundary so a
+    negation in a previous clause ("No lint issues. **Critical**: ...") does not
+    suppress a finding that lives in the following clause.
+    """
     window = block[max(0, phrase_index - _NEGATION_WINDOW_CHARS):phrase_index]
+    boundary_end = None
+    for match in _CLAUSE_BOUNDARY_RE.finditer(window):
+        boundary_end = match.end()
+    if boundary_end is not None:
+        window = window[boundary_end:]
     return bool(_NEGATION_RE.search(window))
 
 
@@ -186,14 +214,19 @@ def find_false_positive_findings(review_text):
     Used only on a control. This is a transparent heuristic, not ground truth: it
     surfaces lines that ASSERT a Major/Critical finding (line-leading severity
     labels incl. markdown headings, plus inline **emphasized** ones) so a human can
-    confirm them. An inline severity label in a NON-negated context counts; a
-    negated dismissal ("No **critical** issues found") does not — it reuses the
-    same negation guard as the catch side, so a clean reviewer is not penalized for
-    saying a defect is absent. See the benchmark README's "Known limitations".
+    confirm them. A severity label in a NON-negated context counts; a dismissal
+    does not — both paths reuse the catch side's negation guard, and the
+    line-leading path additionally ignores "clean bill of health" wording
+    ("## Critical issues: none found", "- Major: none"), so a clean reviewer is not
+    penalized for saying a defect is absent. See the README's "Known limitations".
     """
     matches = []
     for line in review_text.splitlines():
-        if FALSE_POSITIVE_SEVERITY_RE.match(line):
+        leading = FALSE_POSITIVE_SEVERITY_RE.match(line)
+        if leading:
+            rest = line[leading.end(1):]
+            if _is_negated(line.lower(), leading.start(1)) or _ABSENCE_RE.search(rest):
+                continue
             matches.append(line.strip())
             continue
         inline = _INLINE_FALSE_POSITIVE_RE.search(line)
