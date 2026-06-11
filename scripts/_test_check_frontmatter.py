@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _check_frontmatter import check_frontmatter
 
 GOOD = """---
-name: local-architect
-description: designs the approach
+name: local-code-reviewer
+description: reviews function-level correctness
 model: claude-opus-4.8
 tools:
   - read
@@ -37,34 +37,34 @@ def _with_model(line):
 
 class CheckFrontmatterTest(unittest.TestCase):
     def test_well_formed_passes(self):
-        self.assertEqual(check_frontmatter(GOOD, "local-architect"), [])
+        self.assertEqual(check_frontmatter(GOOD, "local-code-reviewer"), [])
 
     def test_model_list_value_rejected(self):
-        errors = check_frontmatter(_with_model("model: [gpt-5.5]"), "local-architect")
+        errors = check_frontmatter(_with_model("model: [gpt-5.5]"), "local-code-reviewer")
         self.assertTrue(any("malformed" in e for e in errors), errors)
 
     def test_block_scalar_model_rejected(self):
-        errors = check_frontmatter(_with_model("model: |"), "local-architect")
+        errors = check_frontmatter(_with_model("model: |"), "local-code-reviewer")
         self.assertTrue(any("malformed" in e for e in errors), errors)
 
     def test_empty_model_value_rejected(self):
-        errors = check_frontmatter(_with_model("model:"), "local-architect")
+        errors = check_frontmatter(_with_model("model:"), "local-code-reviewer")
         self.assertTrue(any("malformed" in e for e in errors), errors)
 
     def test_model_with_space_rejected(self):
-        errors = check_frontmatter(_with_model("model: gpt 5.5"), "local-architect")
+        errors = check_frontmatter(_with_model("model: gpt 5.5"), "local-code-reviewer")
         self.assertTrue(any("malformed" in e for e in errors), errors)
 
     def test_missing_model_key_rejected(self):
-        errors = check_frontmatter(_with_model(None), "local-architect")
+        errors = check_frontmatter(_with_model(None), "local-code-reviewer")
         self.assertTrue(any("missing key 'model'" in e for e in errors), errors)
 
     def test_name_mismatch_rejected(self):
-        errors = check_frontmatter(GOOD, "local-developer")
-        self.assertTrue(any("expected 'local-developer'" in e for e in errors), errors)
+        errors = check_frontmatter(GOOD, "local-critical-reviewer")
+        self.assertTrue(any("expected 'local-critical-reviewer'" in e for e in errors), errors)
 
     def test_no_frontmatter_rejected(self):
-        errors = check_frontmatter("no frontmatter here\n", "local-architect")
+        errors = check_frontmatter("no frontmatter here\n", "local-code-reviewer")
         self.assertEqual(len(errors), 1)
         self.assertIn("frontmatter", errors[0])
 

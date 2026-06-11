@@ -82,6 +82,26 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "(dry-run — no changes will be made)"
 fi
 
+# python3 is required for the playbook-merge (block removal) step. Check BEFORE
+# any destructive work (agent removal) so a missing interpreter can't leave a
+# partial uninstall. Skip the check under --dry-run since nothing is removed.
+if [ "$DRY_RUN" -eq 0 ]; then
+  command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 1; }
+fi
+
+# Strict basename validation, identical to install.sh. A shell glob `case` is NOT
+# sufficient to stop path traversal (glob `*` matches `/`), so a tampered
+# manifest entry like `local-/../../../victim.agent.md` could resolve OUTSIDE
+# $AGENTS_DIR. We require a pure, safe agent basename: `local-<safe chars>.agent.md`,
+# with no `/`, no `..`, and no whitespace/control characters.
+is_safe_agent_name() {
+  local name="$1"
+  case "$name" in
+    */*|*..*) return 1 ;;  # reject any path separator or parent-dir component
+  esac
+  [[ "$name" =~ ^local-[A-Za-z0-9._-]+\.agent\.md$ ]]
+}
+
 # --- Agents: remove ONLY explicit basenames this install owns. ---
 # The removal set is the UNION of:
 #   - the basenames this repo currently ships (agents/local-*.agent.md), and
@@ -110,16 +130,30 @@ fi
 
 removed=0
 for name in "${remove_list[@]}"; do
+  # Defense-in-depth against a tampered manifest: only act on strict, safe agent
+  # basenames so a crafted entry can't delete outside $AGENTS_DIR.
+  if ! is_safe_agent_name "$name"; then
+    echo "  skip (unsafe name): $name"
+    continue
+  fi
   target="$AGENTS_DIR/$name"
   if [ -e "$target" ]; then
     run rm -f "$target"
-    echo "  remove agent: $name"
+    if [ "$DRY_RUN" -eq 1 ]; then
+      echo "  would remove agent: $name"
+    else
+      echo "  remove agent: $name"
+    fi
     removed=$((removed + 1))
   else
     echo "  skip (not installed): $name"
   fi
 done
-echo "Agents removed: $removed"
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "Agents that would be removed: $removed"
+else
+  echo "Agents removed: $removed"
+fi
 
 # --- Playbook ---
 if [ "$PLAYBOOK_ACTION" = "purge" ]; then

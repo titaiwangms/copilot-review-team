@@ -61,6 +61,10 @@ fi
 
 echo "Installing Copilot Review Team into: $COPILOT_DIR"
 
+# python3 is required for the playbook merge step. Check BEFORE any destructive
+# work (agent copy/prune) so a missing interpreter can't leave a partial install.
+command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 1; }
+
 if ! command -v copilot >/dev/null 2>&1; then
   echo "  WARNING: 'copilot' CLI not found on PATH. Files will still be installed, but"
   echo "           you'll need GitHub Copilot CLI to use them. See:"

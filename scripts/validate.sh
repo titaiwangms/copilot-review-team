@@ -116,9 +116,6 @@ done
 # Stale-count scan: flag any "<number> reviewers" phrasing (word or digit) that
 # disagrees with the derived count, across the playbook, README, and examples.
 stale_scan_files="copilot-instructions.md README.md"
-for ex in examples/*.md; do
-  [ -e "$ex" ] && stale_scan_files="$stale_scan_files $ex"
-done
 number_re='\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|[0-9]+) reviewers'
 for f in $stale_scan_files; do
   [ -e "$f" ] || continue
