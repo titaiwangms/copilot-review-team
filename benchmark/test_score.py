@@ -167,6 +167,43 @@ class FalsePositiveDetectionTests(unittest.TestCase):
         self.assertEqual(score.find_false_positive_findings(review), [])
 
 
+class FabricatedFindingTests(unittest.TestCase):
+    """The grounded FP detector: asserting a real corpus defect on a clean control
+    is a fabricated finding regardless of where an 'absence' word is placed."""
+
+    def _corpus(self):
+        return [_defect(defect_id="d-sqli", keywords=["sql injection"], location_tokens=["find_user_by_name", "users.py"])]
+
+    def test_grounded_finding_is_fabricated_on_control(self):
+        review = "SQL injection in find_user_by_name in users.py concatenated into the query."
+        self.assertEqual(score.find_fabricated_findings(review, self._corpus(), "ctrl"), ["d-sqli"])
+
+    def test_sentence_separated_absence_does_not_hide_fabrication(self):
+        # The exact residual bypass: dismiss severity in one sentence, assert the
+        # real located finding in the next. The grounded detector still flags it.
+        review = "Critical: none. SQL injection in find_user_by_name in users.py concatenated into the sql."
+        self.assertEqual(score.find_fabricated_findings(review, self._corpus(), "ctrl"), ["d-sqli"])
+
+    def test_negated_or_unlocated_mention_is_not_fabricated(self):
+        # A clean reviewer who negates the issue, or mentions it without the
+        # defect's specific location, has not fabricated a finding.
+        self.assertEqual(
+            score.find_fabricated_findings("No SQL injection in find_user_by_name; it is parameterized.", self._corpus(), "ctrl"),
+            [],
+        )
+        self.assertEqual(
+            score.find_fabricated_findings("Some generic note about sql injection in general.", self._corpus(), "ctrl"),
+            [],
+        )
+
+    def test_score_fixture_with_corpus_flags_grounded_dodge(self):
+        control = {"id": "ctrl", "title": "t", "defects": []}
+        dodge = "Critical: none, SQL injection in find_user_by_name in users.py concatenated into the sql."
+        result = score.score_fixture(control, dodge, corpus_defects=self._corpus())
+        self.assertTrue(result["is_control"])
+        self.assertGreaterEqual(len(result["false_positives"]), 1)
+
+
 class ScoreFixtureTests(unittest.TestCase):
     def test_defect_fixture_caught(self):
         fixture = {"id": "999-demo", "title": "t", "defects": [_defect()]}

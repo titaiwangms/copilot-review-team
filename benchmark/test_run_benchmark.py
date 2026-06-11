@@ -192,27 +192,34 @@ class MainExitCodeTests(unittest.TestCase):
 
     def test_absence_cue_dodge_on_controls_still_exits_two(self):
         # Gate-level anti-gaming: a 100%-recall reviewer that asserts a real
-        # located finding on the CONTROLS but prefixes it with a bare absence cue
-        # ("**Critical**: none — <real finding>") must NOT bypass the precision
-        # gate. The dodge clause is not entirely an absence statement, so it counts
-        # as a false positive and the gate holds (exit 2).
+        # located finding on the CONTROLS cannot bypass the precision gate by
+        # attaching a bare absence cue to it — in ANY placement. The grounded FP
+        # detector counts the fabricated finding regardless of dismissal wording,
+        # so the gate holds (exit 2). Covers the sentence-separated variant that
+        # slipped past the earlier clause-clip heuristic.
+        dodges = [
+            "- Critical: none. SQL injection in find_user_by_name in users.py concatenated into the sql",
+            "- Critical: none, SQL injection in find_user_by_name in users.py concatenated into the sql",
+            "## Critical: none — SQL injection in find_user_by_name in users.py",
+        ]
         fixtures = [run_benchmark.score.load_fixture(d) for d in run_benchmark.discover_fixtures()]
-        with tempfile.TemporaryDirectory() as tmp:
-            for fixture in fixtures:
-                if fixture["defects"]:
-                    body = "\n".join(
-                        "- **%s**: in %s — %s"
-                        % (defect["severity"], " ".join(defect["location_tokens"]), defect["description"])
-                        for defect in fixture["defects"]
-                    )
-                else:  # control — prepend an absence cue to a fabricated finding
-                    body = "- **Critical**: none — SQL injection in the request handler"
-                with open(os.path.join(tmp, fixture["id"] + ".md"), "w") as handle:
-                    handle.write(body)
-            code, out = self._run(tmp)
-        self.assertEqual(code, 2, out)
-        self.assertIn("catch-rate      : 100%", out)
-        self.assertNotIn("false positives : 0", out)
+        for dodge in dodges:
+            with tempfile.TemporaryDirectory() as tmp:
+                for fixture in fixtures:
+                    if fixture["defects"]:
+                        body = "\n".join(
+                            "- **%s**: in %s — %s"
+                            % (defect["severity"], " ".join(defect["location_tokens"]), defect["description"])
+                            for defect in fixture["defects"]
+                        )
+                    else:  # control — attach an absence cue to a fabricated real finding
+                        body = dodge
+                    with open(os.path.join(tmp, fixture["id"] + ".md"), "w") as handle:
+                        handle.write(body)
+                code, out = self._run(tmp)
+            self.assertEqual(code, 2, "dodge should fail the gate: %r\n%s" % (dodge, out))
+            self.assertIn("catch-rate      : 100%", out)
+            self.assertNotIn("false positives : 0", out)
 
     def test_clean_reviewer_with_bolded_negated_dismissal_exits_zero(self):
         # All defects caught; controls carry a bolded NEGATED dismissal

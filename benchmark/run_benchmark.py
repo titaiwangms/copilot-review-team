@@ -127,6 +127,11 @@ def run_configuration(config, fixtures, timeout, save_reviews=None):
     if save_reviews:
         os.makedirs(save_reviews, exist_ok=True)
 
+    # Every planted defect in the corpus. A control contains none of them, so a
+    # review that "catches" one on a control has fabricated a finding — counted as
+    # a false positive by score_fixture's grounded detector.
+    corpus_defects = [defect for fixture in fixtures for defect in fixture["defects"]]
+
     for fixture in fixtures:
         if config["kind"] == "cmd":
             review_text, warning = review_from_command(fixture, config["value"], timeout)
@@ -138,7 +143,7 @@ def run_configuration(config, fixtures, timeout, save_reviews=None):
             review_text, warning = review_from_dir(fixture, config["value"])
         if warning:
             warnings.append("%s: %s" % (fixture["id"], warning))
-        fixture_results.append(score.score_fixture(fixture, review_text))
+        fixture_results.append(score.score_fixture(fixture, review_text, corpus_defects))
 
     summary = score.aggregate(fixture_results)
     return fixture_results, summary, warnings

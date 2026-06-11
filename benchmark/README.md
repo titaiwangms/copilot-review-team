@@ -247,17 +247,26 @@ They are why this is gated as a proof of concept rather than wired into CI today
   (1) a **splatter** reviewer that emits located findings for every fixture
   (including controls) needs no reading at all — it is caught purely by the
   false-positive count on the controls, which is exactly why the single-config
-  exit gate fails on false positives, not just misses; (2) a **determined**
+  exit gate fails on false positives, not just misses. Because that count is
+  **grounded** (see below), attaching an "absence" word to the fabricated finding
+  does not suppress it; (2) a **determined**
   attacker could read every diff and assemble a per-fixture key (correct symbol +
   phrase adjacency) — but that requires actually reading the code, which is the
   behavior we want. Mitigations for a trusted version: opaque/rotating fixture ids
   (the harness already withholds the id and uses a random per-run token), a private
   held-out corpus, and periodic fixture rotation.
-- **False-positive scoring is heuristic.** A control flags lines that look like
-  Major/Critical findings (line-leading or inline-bolded severity labels, incl.
-  markdown headings); it surfaces the offending lines for human confirmation rather
-  than asserting they are wrong. Minor/Nit suggestions on clean code are not
-  penalized.
+- **False-positive scoring uses two detectors.** On a control the benchmark counts
+  false positives as the union of (1) a **grounded** detector — a finding that
+  asserts a *real corpus defect* (the same located, non-negated phrase that would
+  count as a catch on the planted fixture) is a fabricated finding, because the
+  control contains none of those defects; and (2) a **heuristic** detector for
+  fabricated severity assertions that match no planted defect (line-leading or
+  inline-bolded severity labels, incl. markdown headings), which surfaces the
+  offending lines for human confirmation. The grounded detector reuses the catch
+  logic, so a gaming reviewer cannot dodge the precision gate by attaching an
+  "absence" word ("Critical: none. SQL injection in …") to a genuine located
+  finding — the located phrase is still counted. Minor/Nit suggestions on clean
+  code are not penalized, and a clean "no issues found" dismissal scores zero.
 - **Negation handling is shallow.** A short window before the phrase is scanned for
   negation cues; unusual phrasing ("hardly a real injection") may slip through.
   Phrase specificity and location grounding are the primary defenses; negation is a

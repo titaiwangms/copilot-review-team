@@ -250,11 +250,34 @@ def find_false_positive_findings(review_text):
     return matches
 
 
-def score_fixture(fixture, review_text):
+def find_fabricated_findings(review_text, corpus_defects, fixture_id=""):
+    """Return ids of corpus defects that a CONTROL review fabricates.
+
+    A control contains NONE of the corpus's planted defects, so a review that
+    "catches" one — a grounded, non-negated, located finding that would count as
+    a catch on the real fixture — has fabricated it. This reuses the exact catch
+    logic (`defect_is_caught`), so the two paths share ONE negation/grounding
+    vocabulary: a finding is graded by its concrete located phrase, NOT by nearby
+    "absence" wording. No placement of a bare "none" (before, after, or in another
+    clause/sentence) can suppress it, because the located phrase is still caught.
+    """
+    fabricated = []
+    for defect in corpus_defects:
+        if defect_is_caught(defect, review_text, fixture_id) is not None:
+            fabricated.append(defect["id"])
+    return fabricated
+
+
+def score_fixture(fixture, review_text, corpus_defects=None):
     """Score a single reviewer output against one fixture.
 
     Returns a dict describing caught/missed defects and (for the clean control)
-    false-positive finding lines.
+    false-positive finding lines. On a control, false positives are the UNION of
+    two detectors: (1) fabricated severity assertions that match no real defect
+    (the line-leading/inline heuristic) and (2) grounded findings that assert a
+    REAL corpus defect on clean code (`corpus_defects`, when provided). The second
+    detector reuses the catch logic, so a gaming reviewer cannot dodge the
+    precision gate by attaching an "absence" word to a genuine located finding.
     """
     caught = []
     missed = []
@@ -272,7 +295,14 @@ def score_fixture(fixture, review_text):
             missed.append(record)
 
     is_control = len(fixture["defects"]) == 0
-    false_positives = find_false_positive_findings(review_text) if is_control else []
+    false_positives = []
+    if is_control:
+        false_positives = list(find_false_positive_findings(review_text))
+        if corpus_defects:
+            for defect_id in find_fabricated_findings(review_text, corpus_defects, fixture["id"]):
+                false_positives.append(
+                    "fabricated finding: planted defect %s asserted on a clean control" % defect_id
+                )
 
     return {
         "id": fixture["id"],
