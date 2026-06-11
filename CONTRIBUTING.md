@@ -30,7 +30,9 @@ anything.
   source of truth. Edit it there and re-run `./install.sh`.
 
 - **Keep agents self-contained.** Each `local-*.agent.md` is a fresh context — don't
-  assume it can see conversation state.
+  assume it can see conversation state. (It also keeps each agent's git history clean:
+  `git log --follow -p agents/local-*.agent.md` is the per-agent evolution log — no
+  separate changelog needed.)
 
 - **Bump the `VERSION` file when shipping changes.** It holds a single semver line
   (e.g. `1.0.0`). `install.sh` reads it to stamp the install and to print a

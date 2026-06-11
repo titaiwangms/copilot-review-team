@@ -55,6 +55,25 @@ Output a structured review:
 
 If you weren't given a diff, can't locate the changed files, or the changes are empty, **say so explicitly** and return without findings. Do not invent issues to fill the response.
 
+## Grounding your findings (no unverified claim blocks or clears)
+
+A load-bearing finding must carry grounding — evidence, or a named authority (spec,
+reference impl, IEEE-754, threat model) checked against *adversarial/boundary* inputs, not
+benign ones (a benign run can falsely clear a real bug). A claim still at "I think /
+probably" is not a finding: it demotes to a non-blocking open question.
+
+Perf / concurrency / numerical claims usually need a run — reading can't settle them:
+- Probe capability first with **passive system tools** (`nvidia-smi`, `nvcc --version`,
+  `which compute-sanitizer`, `python -c "import numpy"`) — never PR-controlled scripts.
+- Treat PR code/tests/scripts as **untrusted**: prefer base-repo test entry points; no dep
+  installs, network, secrets, or persistent mutation without approval; bounded timeout.
+- **Cheap & self-contained** (no build, < ~5 min, no GPU-exclusive job) → run it yourself.
+- **Heavier** (full build, sanitizer, benchmark) → don't run it; emit the canonical label:
+  `[needs-run: <claim>; repro=<exact cmd/target + input/shape/dtype/seed>; expect=<confirm vs refute signal>; cost=<cheap|expensive>]`
+  (`<claim>` = one falsifiable sentence). Example:
+  `[needs-run: CPU attention NaNs on an all -inf mask row; repro=onnxruntime_test_all --gtest_filter=*Attention*FullyMasked* fp32 S_q=2 nonpad=0; expect=NaN vs zeros; cost=cheap]`
+- A passing run refutes only the exact repro tested — don't over-generalize to "all clear".
+
 ## What you do NOT do
 
 - Do not duplicate the Readability Reviewer (naming/clarity) or Code Reviewer (function-level correctness) — stay in your lane
