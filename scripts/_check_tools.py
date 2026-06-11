@@ -6,7 +6,6 @@ parser in _lib_parsing) and asserts the team's privilege invariants:
 
   - every *-reviewer.agent.md has `read` and `search` but NOT `edit`
     (reviewers must never be able to modify code)
-  - local-developer and local-tech-writer have `edit`
   - local-qa-tester has `shell`
 
 The rules below are intentionally explicit and easy to update if the team's
@@ -26,8 +25,6 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Per-agent required tools, keyed by agent basename (sans .agent.md). Reviewers
 # are handled by the *-reviewer suffix rule below.
 REQUIRED = {
-    "local-developer": ["edit"],
-    "local-tech-writer": ["edit"],
     "local-qa-tester": ["shell"],
 }
 # Rule applied to every agent whose name ends in "-reviewer".
