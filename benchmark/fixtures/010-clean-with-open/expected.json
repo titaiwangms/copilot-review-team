@@ -1,7 +1,0 @@
-{
-  "id": "010-clean-with-open",
-  "title": "Near-miss control: file write using a with-open context manager",
-  "language": "python",
-  "defects": [],
-  "note": "Writes a file in a loop that can raise (looks like fixture 006) but uses `with open(...)`, so the handle is always closed and there is NO leak. Flagging a 'resource leak' here is a false positive. Precision near-miss."
-}

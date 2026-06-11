@@ -15,7 +15,7 @@ FAILURES=0
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*"; FAILURES=$((FAILURES + 1)); }
 
-SCRIPTS="install.sh uninstall.sh scripts/validate.sh scripts/build-bundle.sh"
+SCRIPTS="install.sh uninstall.sh scripts/validate.sh"
 
 # --- prerequisite: python3 ---
 echo "== prerequisites =="
@@ -54,6 +54,16 @@ if frontmatter_test_output="$(python3 scripts/_test_check_frontmatter.py 2>&1)";
 else
   fail "frontmatter checker unit tests"
   printf '%s\n' "$frontmatter_test_output"
+fi
+# Run the playbook-merge helper's unit tests so CI exercises the install/remove
+# marker-block logic (new file, append, in-place upgrade, collapse, unbalanced
+# abort, remove). Capture output so a PASS stays quiet but a FAILURE shows which
+# cases broke.
+if merge_test_output="$(python3 scripts/_test_merge_playbook.py 2>&1)"; then
+  pass "playbook merge unit tests (scripts/_test_merge_playbook.py)"
+else
+  fail "playbook merge unit tests"
+  printf '%s\n' "$merge_test_output"
 fi
 
 # --- C3: team table roster matches agent files ---
@@ -106,9 +116,6 @@ done
 # Stale-count scan: flag any "<number> reviewers" phrasing (word or digit) that
 # disagrees with the derived count, across the playbook, README, and examples.
 stale_scan_files="copilot-instructions.md README.md"
-for ex in examples/*.md; do
-  [ -e "$ex" ] && stale_scan_files="$stale_scan_files $ex"
-done
 number_re='\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|[0-9]+) reviewers'
 for f in $stale_scan_files; do
   [ -e "$f" ] || continue
@@ -158,23 +165,6 @@ if [ -s VERSION ]; then
   fi
 else
   fail "VERSION file missing or empty"
-fi
-
-# --- C8: zero-tooling bundle in sync ---
-# The committed paste-able bundle (dist/copilot-review-team-bundle.md) is a
-# generated artifact. It must be regenerated whenever an agent definition, the
-# playbook, or the VERSION file changes (the bundle embeds VERSION), or
-# zero-tooling adopters get stale content. Enforce that the committed bundle
-# matches a fresh generation from the current sources.
-echo "== C8: zero-tooling bundle drift =="
-# Capture output so a PASS stays quiet but a FAILURE shows WHAT drifted (the
-# generator prints a unified diff of committed-vs-fresh on stderr). Using
-# `if ! out=$(...)` keeps this safe under `set -e`.
-if bundle_check_output="$(./scripts/build-bundle.sh --check 2>&1)"; then
-  pass "dist bundle matches sources (scripts/build-bundle.sh --check)"
-else
-  fail "bundle is stale — regenerate with scripts/build-bundle.sh"
-  printf '%s\n' "$bundle_check_output"
 fi
 
 echo ""

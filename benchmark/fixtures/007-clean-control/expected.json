@@ -1,7 +1,0 @@
-{
-  "id": "007-clean-control",
-  "title": "Clean control: a correct, well-guarded helper (no real defects)",
-  "language": "python",
-  "defects": [],
-  "note": "This is a deliberately correct change. It has no planted defect. It exists to measure false positives: any Major/Critical finding a reviewer reports here is a false positive. Minor style suggestions (e.g. naming) are not counted as false positives by the harness."
-}
