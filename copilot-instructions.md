@@ -1,4 +1,4 @@
-# Multi-agent review team playbook (lightweight flightdeck)
+# Multi-agent review team playbook
 
 > **STOP — applicability check.** Before following anything below, check whether
 > your active agent/role prompt contains flightdeck-specific commands such as
@@ -193,8 +193,8 @@ reviewers — that's the main source of review value.
 - **Not a flightdeck server.** These agents have no access to AGENT_MESSAGE,
   COMPLETE_TASK, COMMIT, or any U+27E6/U+27E7 bracket commands. They are plain Copilot
   CLI custom agents. Don't try to send them flightdeck commands.
-- **Not persistent across `task` calls.** Each delegation is a fresh context window.
-  Pass any state forward in the prompt yourself.
+- **Not persistent across delegations.** Each sub-agent call runs in a fresh
+  context window — pass any state forward in the prompt.
 - **Not a substitute for thinking.** You are the lead; you own the decomposition,
   the synthesis, and the final answer. The team executes pieces under your direction.
 

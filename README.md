@@ -4,19 +4,13 @@
 
 A drop-in **multi-agent code-review team** for
 [GitHub Copilot CLI](https://github.com/github/copilot-cli). Point it at a PR, a
-diff, or a set of changed files and it fans the change out to a panel of
-specialized reviewers — spread across three model families — then synthesizes
-their findings by severity into one report.
+diff, or a set of changed files and it fans the change out to five specialized
+reviewers and a QA tester — spread across three model families — then
+synthesizes their findings by severity into one report.
 
 Instead of one model reviewing everything, the lead Copilot agent delegates to a
 team of focused sub-agents — **five reviewers + a QA tester** — wired together by a
 **playbook** into a review → synthesize → (loop) → report pipeline.
-
-> **Disclaimer.** This is a personal setup I happen to find useful, shared as-is —
-> not an official product, a standard, or a guarantee of anything. Treat it as a
-> starting template: **fork it, swap the models, rewrite the playbook, throw out
-> the parts you don't like.** Feedback and PRs are welcome (see
-> [CONTRIBUTING.md](CONTRIBUTING.md)), but you owe me nothing for using it. 🙂
 
 ## Why multi-agent review (not one model)
 
@@ -42,7 +36,7 @@ spread is the main source of review value.
 
 ## Match review depth to task size
 
-The playbook scales effort to the change:
+The playbook defines the full tiers; quick version:
 
 - **Trivial** (typo, one-liner, doc-only): the lead reads it; no team.
 - **Small** (one file, well-defined): a reviewer or two.
@@ -78,7 +72,7 @@ add must follow that naming to be picked up.
 agents/                       6 sub-agent definitions
   local-readability-reviewer.agent.md  Naming, clarity, organization, docs
   local-code-reviewer.agent.md         Correctness, idiom, patterns, test quality
-  local-critical-reviewer.agent.md     Adversarial: security, perf, failure modes, structure
+  local-critical-reviewer.agent.md     Adversarial: bugs, security, perf, edge cases, structural design
   local-deep-reviewer.agent.md         Spec/math arbiter: multi-file invariants, tie-breaker
   local-integration-reviewer.agent.md  Cross-module / whole-codebase consistency
   local-qa-tester.agent.md             Actually runs the code, reports repro steps
@@ -97,7 +91,7 @@ scripts/validate.sh           Repo self-checks (run before submitting a PR; also
 When you ask the lead to **"review &lt;PR url or number&gt;"** (or hand it a diff):
 
 1. **Fetch / frame** the change and do a quick read-through.
-2. **Parallel fan-out** — all five reviewers run in a single turn, each getting the
+2. **Parallel fan-out** — all five reviewers run in parallel, at once, each getting the
    diff inline plus role-specific framing. (The QA tester joins only when running
    the code is warranted — review-only ≠ run the code.)
 3. **Severity synthesis** — findings are deduplicated and prioritized
@@ -227,6 +221,12 @@ instructions layer on top of (and win over) your global ones.
   check.
 - Tested with Copilot CLI. Requires an account with access to the referenced
   models (swap as needed).
+
+> **Disclaimer.** This is a personal setup I happen to find useful, shared as-is —
+> not an official product, a standard, or a guarantee of anything. Treat it as a
+> starting template: **fork it, swap the models, rewrite the playbook, throw out
+> the parts you don't like.** Feedback and PRs are welcome (see
+> [CONTRIBUTING.md](CONTRIBUTING.md)), but you owe me nothing for using it. 🙂
 
 ## License
 
