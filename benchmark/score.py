@@ -53,16 +53,24 @@ _NEGATION_WINDOW_CHARS = 30
 # boundary and wrongly suppress the later finding.
 _CLAUSE_BOUNDARY_RE = re.compile(r"[.;!?\n]")
 
-# Absence/dismissal cues. When one of these follows a line-leading severity label
-# ("## Critical issues: none found", "- Major: none") the reviewer is giving a
-# clean bill of health, not asserting a finding, so it is NOT a false positive.
-_ABSENCE_RE = re.compile(
-    r"(?i)\b("
-    r"none|nothing|not found|n/?a|all clear|"
-    r"no (?:critical|major|such|known )?"
-    r"(?:issues?|concerns?|problems?|findings?|defects?|bugs?|vulnerabilit\w+)|"
-    r"looks? (?:good|clean|fine)"
-    r")\b"
+# A line-leading severity label is a clean "bill of health" (NOT a false positive)
+# only when the clause right after it is ENTIRELY an absence statement — e.g.
+# "Critical issues: none found", "- Major: none". The match is anchored end-to-end
+# so a real located finding cannot dodge the FP count by appending OR prepending a
+# bare absence cue ("Critical: <finding>; none." / "Critical: none — <finding>"):
+# such a clause carries substantive content beyond the absence cue and so is still
+# counted as the false positive it is on a control.
+_DISMISSAL_CLAUSE_RE = re.compile(
+    r"(?i)^\s*[:\-]?\s*"
+    r"(?:(?:critical|major|security|other|known|additional)\s+)*"
+    r"(?:issues?|concerns?|problems?|findings?|defects?|bugs?|vulnerabilit\w+)?"
+    r"\s*[:\-]?\s*"
+    r"(?:are|were|is|was)?\s*"
+    r"(?:none|nothing|n/?a|"
+    r"not\s+(?:found|present|detected|identified)|"
+    r"no\s+(?:issues?|concerns?|problems?|findings?|defects?|bugs?|vulnerabilit\w+))"
+    r"(?:\s+(?:found|present|detected|identified|noted|here|observed))?"
+    r"\s*[.!]*\s*$"
 )
 
 # A clean-control finding is treated as a false positive only when the reviewer
@@ -215,21 +223,24 @@ def find_false_positive_findings(review_text):
     surfaces lines that ASSERT a Major/Critical finding (line-leading severity
     labels incl. markdown headings, plus inline **emphasized** ones) so a human can
     confirm them. A severity label in a NON-negated context counts; a dismissal
-    does not — both paths reuse the catch side's negation guard, and the
-    line-leading path additionally ignores "clean bill of health" wording
-    ("## Critical issues: none found", "- Major: none"), so a clean reviewer is not
-    penalized for saying a defect is absent. See the README's "Known limitations".
+    does not. The inline path reuses the catch side's clause-local negation guard;
+    the line-leading path treats a label as a clean "bill of health" only when the
+    clause right after it is ENTIRELY an absence statement ("## Critical issues:
+    none found", "- Major: none"). Because that match is anchored, a real located
+    finding cannot dodge the count by appending OR prepending a bare absence cue
+    ("Critical: <finding>; none." / "Critical: none — <finding>"). See the README's
+    "Known limitations".
     """
     matches = []
     for line in review_text.splitlines():
         leading = FALSE_POSITIVE_SEVERITY_RE.match(line)
         if leading:
-            # Only the clause IMMEDIATELY after the severity label decides
-            # dismissal-vs-finding. A real located finding must not dodge the FP
-            # count by appending an absence cue in a later clause
-            # ("Critical: SQL injection in db.py; none.").
+            # The clause IMMEDIATELY after the severity label decides
+            # dismissal-vs-finding; it is a dismissal only when that clause is
+            # entirely an absence statement (anchored), so appended/prepended
+            # absence cues on a real finding cannot suppress the false positive.
             first_clause = _CLAUSE_BOUNDARY_RE.split(line[leading.end(1):], 1)[0]
-            if _is_negated(line.lower(), leading.start(1)) or _ABSENCE_RE.search(first_clause):
+            if _DISMISSAL_CLAUSE_RE.match(first_clause):
                 continue
             matches.append(line.strip())
             continue

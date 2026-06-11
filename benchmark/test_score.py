@@ -141,6 +141,19 @@ class FalsePositiveDetectionTests(unittest.TestCase):
         )
         self.assertEqual(score.find_false_positive_findings("## Critical: none found"), [])
 
+    def test_prepended_absence_cue_does_not_hide_a_real_finding(self):
+        # Placement-robust variant: a bare absence cue PREFIXING a real located
+        # finding ("Critical: none — SQL injection in <loc>") must NOT dismiss it,
+        # because the clause is not entirely an absence statement.
+        self.assertEqual(
+            len(score.find_false_positive_findings("## Critical: none — SQL injection in find_user")), 1
+        )
+        self.assertEqual(
+            len(score.find_false_positive_findings("- Critical: none, SQL injection in find_user")), 1
+        )
+        # A pure clean dismissal is still 0 FP.
+        self.assertEqual(score.find_false_positive_findings("- Critical: none"), [])
+
     def test_no_issues_prose_is_not_flagged(self):
         review = "No major issues found. The code looks correct and well tested."
         self.assertEqual(score.find_false_positive_findings(review), [])
