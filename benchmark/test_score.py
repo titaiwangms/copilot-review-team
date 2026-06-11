@@ -93,23 +93,52 @@ class NegationTests(unittest.TestCase):
         review = "archive_path runs with shell=true — command injection is possible."
         self.assertEqual(score.defect_is_caught(defect, review), "command injection")
 
+    def test_unrelated_prior_clause_negation_does_not_suppress_catch(self):
+        # Clause-local negation (the reason _CLAUSE_BOUNDARY_RE is retained): an
+        # unrelated "No" in an earlier sentence, within the lookbehind window, must
+        # NOT suppress a genuine grounded catch in the following clause. A plain
+        # fixed-window scan would wrongly miss this.
+        defect = _defect(keywords=["command injection"], location_tokens=["archive_path"])
+        review = "No lint issues. command injection in archive_path via shell."
+        self.assertEqual(score.defect_is_caught(defect, review), "command injection")
+
 
 class FalsePositiveDetectionTests(unittest.TestCase):
-    def test_bulleted_major_finding_is_flagged(self):
-        review = "Findings:\n- Major: this variable is poorly named\n"
+    """The precision-gate contract: a false positive is a fabricated finding that
+    asserts a concrete LOCATED defect on clean code (severity assertion + a
+    non-negated structural code-location reference). An UNGROUNDED, locationless
+    severity assertion ("Critical: imagined bug") is NOT a false positive — it is
+    unfalsifiable as a finding, and such a reviewer earns zero catches, so it fails
+    the benchmark on RECALL rather than precision. This keeps the FP definition
+    symmetric with the catch side (both require grounding) and removes the
+    absence-vocabulary whack-a-mole. See benchmark/README.md."""
+
+    def test_located_bulleted_major_finding_is_flagged(self):
+        # A bulleted Major that names a code location is a fabricated located
+        # finding on clean code -> false positive.
+        review = "Findings:\n- Major: variable shadow in build_query in users.py\n"
         self.assertEqual(len(score.find_false_positive_findings(review)), 1)
 
-    def test_bolded_critical_finding_is_flagged(self):
-        review = "**Critical** — unguarded input\nsome prose"
+    def test_located_bolded_critical_finding_is_flagged(self):
+        review = "**Critical** — unguarded input in `parse_request()`\nsome prose"
         self.assertEqual(len(score.find_false_positive_findings(review)), 1)
 
-    def test_markdown_heading_severity_is_flagged(self):
-        review = "## Critical: imagined bug in clean code\n"
+    def test_located_markdown_heading_severity_is_flagged(self):
+        review = "## Critical: off-by-one in compute_offset at line 12\n"
         self.assertEqual(len(score.find_false_positive_findings(review)), 1)
 
-    def test_inline_bolded_severity_is_flagged(self):
-        review = "This is a **critical** bug in otherwise clean code."
+    def test_located_inline_bolded_severity_is_flagged(self):
+        review = "This is a **critical** bug in `handler.py:88` on clean code."
         self.assertEqual(len(score.find_false_positive_findings(review)), 1)
+
+    def test_ungrounded_severity_assertions_are_not_false_positives(self):
+        # NEW CONTRACT: these were previously flagged, but a vague severity claim
+        # with NO code location is not a falsifiable finding. It is unscored as an
+        # FP (the reviewer still fails on recall, scoring zero catches).
+        self.assertEqual(score.find_false_positive_findings("- Major: this variable is poorly named"), [])
+        self.assertEqual(score.find_false_positive_findings("**Critical** — unguarded input"), [])
+        self.assertEqual(score.find_false_positive_findings("## Critical: imagined bug in clean code"), [])
+        self.assertEqual(score.find_false_positive_findings("This is a **critical** bug in otherwise clean code."), [])
 
     def test_negated_inline_bolded_severity_is_not_flagged(self):
         # A clean reviewer dismissing severity must NOT accrue a phantom FP —
@@ -118,33 +147,43 @@ class FalsePositiveDetectionTests(unittest.TestCase):
         self.assertEqual(score.find_false_positive_findings("There are no **major** problems here."), [])
 
     def test_heading_led_clean_dismissal_is_not_flagged(self):
-        # Line-leading severity labels that report ABSENCE ("none found", "none")
-        # are a clean bill of health, not a false positive. This heading/bullet
-        # format is exactly what this repo's reviewers emit, so flagging it would
-        # trip the precision gate (exit 2) for a correct reviewer.
+        # Line-leading severity labels reporting ABSENCE are a clean bill of health,
+        # not a false positive: they cite no code location, so they are not located
+        # findings. This heading/bullet format is exactly what this repo's reviewers
+        # emit, so flagging it would trip the precision gate (exit 2) for a correct
+        # reviewer.
         self.assertEqual(score.find_false_positive_findings("## Critical issues: none found"), [])
         self.assertEqual(score.find_false_positive_findings("- Critical: none"), [])
         self.assertEqual(score.find_false_positive_findings("## Major concerns: none"), [])
 
-    def test_unrelated_leading_negation_does_not_suppress_real_inline_finding(self):
-        # The inline negation guard must be clause-local: an unrelated "No" in an
-        # earlier sentence must not suppress a genuine inline severity finding.
-        review = "No lint issues. **Critical**: SQL injection"
+    def test_unrelated_leading_negation_does_not_suppress_real_located_finding(self):
+        # Clause-local negation guard (shared with the catch side): an unrelated
+        # "No" in an earlier sentence must not suppress a genuine LOCATED finding in
+        # the following clause.
+        review = "No lint issues. **Critical**: SQL injection in users.py"
         self.assertEqual(len(score.find_false_positive_findings(review)), 1)
 
-    def test_appended_absence_cue_does_not_hide_a_real_finding(self):
-        # A located finding must not dodge the FP count by tacking an absence cue
-        # onto a later clause; only the clause right after the severity label
-        # decides dismissal. The clean dismissal still yields 0 FP.
+    def test_negated_located_reference_is_not_a_false_positive(self):
+        # The reviewer correctly DECLINING to flag a located defect ("no SQL
+        # injection in find_user_by_name — it is parameterized") is not a false
+        # positive: the located reference is negated.
+        self.assertEqual(
+            score.find_false_positive_findings("## Critical: no SQL injection in find_user_by_name; parameterized"),
+            [],
+        )
+
+    def test_appended_absence_cue_does_not_hide_a_located_finding(self):
+        # A located finding cannot dodge the FP count by tacking an absence cue
+        # onto a later clause; the located reference is what is graded.
         self.assertEqual(
             len(score.find_false_positive_findings("## Critical: SQL injection in db.py; none.")), 1
         )
         self.assertEqual(score.find_false_positive_findings("## Critical: none found"), [])
 
-    def test_prepended_absence_cue_does_not_hide_a_real_finding(self):
-        # Placement-robust variant: a bare absence cue PREFIXING a real located
-        # finding ("Critical: none — SQL injection in <loc>") must NOT dismiss it,
-        # because the clause is not entirely an absence statement.
+    def test_prepended_absence_cue_does_not_hide_a_located_finding(self):
+        # Placement-robust: a bare absence cue PREFIXING a real located finding
+        # ("Critical: none — SQL injection in find_user") must NOT dismiss it,
+        # because the located reference is still asserted and non-negated.
         self.assertEqual(
             len(score.find_false_positive_findings("## Critical: none — SQL injection in find_user")), 1
         )
@@ -165,6 +204,45 @@ class FalsePositiveDetectionTests(unittest.TestCase):
     def test_minor_and_nit_are_not_false_positives(self):
         review = "- Minor: consider a clearer name\n- Nit: trailing whitespace"
         self.assertEqual(score.find_false_positive_findings(review), [])
+
+
+class CleanSignOffTests(unittest.TestCase):
+    """Regression guard for the inverse FP-asymmetry: natural clean sign-offs at a
+    Critical/Major heading must score ZERO false positives. The grounded contract
+    handles these for free (no code location cited -> not a located finding ->
+    not an FP), with no sign-off vocabulary to enumerate. Pin them so a future
+    change cannot re-introduce false-flagging of honest clean reviews."""
+
+    SIGN_OFFS = [
+        "## Critical: all clear",
+        "## Critical: looks good",
+        "## Critical: looks clean",
+        "## Critical: looks fine",
+        "## Critical: nothing to flag here",
+        "## Critical: nothing of concern",
+        "## Critical: none of note",
+        "## Major concerns: looks good",
+    ]
+
+    def test_clean_sign_offs_are_not_false_positives(self):
+        for sign_off in self.SIGN_OFFS:
+            self.assertEqual(
+                score.find_false_positive_findings(sign_off), [],
+                "clean sign-off was wrongly flagged as a false positive: %r" % sign_off,
+            )
+
+    def test_clean_sign_offs_score_zero_fp_as_a_control(self):
+        control = {"id": "ctrl", "title": "t", "defects": []}
+        corpus = [_defect(defect_id="d-sqli", keywords=["sql injection"],
+                          location_tokens=["find_user_by_name", "users.py"])]
+        for sign_off in self.SIGN_OFFS:
+            result = score.score_fixture(control, sign_off, corpus_defects=corpus)
+            self.assertTrue(result["is_control"])
+            self.assertEqual(
+                result["false_positives"], [],
+                "clean sign-off produced false positives on a control: %r" % sign_off,
+            )
+
 
 
 class FabricatedFindingTests(unittest.TestCase):
@@ -222,7 +300,7 @@ class ScoreFixtureTests(unittest.TestCase):
 
     def test_control_counts_false_positives(self):
         fixture = {"id": "ctrl", "title": "t", "defects": []}
-        review = "- Critical: imagined bug\nsome prose"
+        review = "- Critical: imagined bug in render_page in views.py\nsome prose"
         result = score.score_fixture(fixture, review)
         self.assertTrue(result["is_control"])
         self.assertEqual(len(result["false_positives"]), 1)

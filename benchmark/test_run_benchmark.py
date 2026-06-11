@@ -181,8 +181,8 @@ class MainExitCodeTests(unittest.TestCase):
                         for defect in fixture["defects"]
                     ]
                     body = "\n".join(lines)
-                else:  # control — splatter a false positive
-                    body = "- **Critical**: this clean control looks suspicious to me."
+                else:  # control — splatter a fabricated LOCATED finding
+                    body = "- **Critical**: buffer overflow in render_page in views.py at line 7."
                 with open(os.path.join(tmp, fixture["id"] + ".md"), "w") as handle:
                     handle.write(body)
             code, out = self._run(tmp)
@@ -240,6 +240,38 @@ class MainExitCodeTests(unittest.TestCase):
                     handle.write(body)
             code, out = self._run(tmp)
         self.assertEqual(code, 0, out)
+        self.assertIn("false positives : 0", out)
+
+    def test_clean_reviewer_with_heading_sign_offs_exits_zero(self):
+        # Inverse-asymmetry guard at the gate: a reviewer that catches every defect
+        # and signs off the controls with natural clean-bill-of-health headings
+        # ("## Critical: all clear", "looks good", "none of note") cites no code, so
+        # those are not located findings and not false positives -> exit 0. A clean
+        # reviewer must never be failed for declining to flag clean code.
+        sign_offs = [
+            "## Critical: all clear",
+            "## Critical: looks good",
+            "## Critical: nothing to flag here",
+            "## Major concerns: none of note",
+        ]
+        fixtures = [run_benchmark.score.load_fixture(d) for d in run_benchmark.discover_fixtures()]
+        with tempfile.TemporaryDirectory() as tmp:
+            control_index = 0
+            for fixture in fixtures:
+                if fixture["defects"]:
+                    body = "\n".join(
+                        "- **%s**: in %s — %s"
+                        % (defect["severity"], " ".join(defect["location_tokens"]), defect["description"])
+                        for defect in fixture["defects"]
+                    )
+                else:
+                    body = sign_offs[control_index % len(sign_offs)]
+                    control_index += 1
+                with open(os.path.join(tmp, fixture["id"] + ".md"), "w") as handle:
+                    handle.write(body)
+            code, out = self._run(tmp)
+        self.assertEqual(code, 0, out)
+        self.assertIn("catch-rate      : 100%", out)
         self.assertIn("false positives : 0", out)
 
     def test_invalid_config_exits_one(self):

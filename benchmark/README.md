@@ -22,8 +22,11 @@ the **expected finding** for each, the harness reports:
 
 - **Catch-rate** — `caught / total planted defects` (per fixture and overall).
 - **Misses** — planted defects no reviewer flagged.
-- **False positives** — Major/Critical findings raised against a **control**
-  fixture (a clean change or a near-miss), which has no real defect.
+- **False positives** — a fabricated finding that asserts a concrete **located**
+  defect (a Major/Critical severity assertion naming a code location) against a
+  **control** fixture (a clean change or near-miss), which has no real defect. A
+  clean sign-off that names no code ("## Critical: all clear", "looks good") is
+  **not** a false positive — see [What counts as a false positive](#what-counts-as-a-false-positive).
 
 ### What counts as a catch
 
@@ -47,6 +50,42 @@ change. Citing `file:line` / the symbol is exactly what real reviewers (and this
 repo's reviewer agents) are told to do, so this rewards genuine findings and
 rejects keyword splatter. Phrase and location lists live in each fixture's
 `expected.json`, so tuning a match is a data edit, not a code change.
+
+### What counts as a false positive
+
+A false positive uses the **same grounding principle** as a catch, applied to a
+clean control: it is a fabricated finding that asserts a concrete **located**
+defect on code that has none. A control line is counted only when it has **both**:
+
+1. a **Major/Critical severity assertion** — line-leading (incl. markdown
+   headings/bullets, e.g. `## Critical:`, `- Major:`) or inline-emphasized
+   (`**Critical**`), in a non-negated context; **and**
+2. a **non-negated code-location reference** — a filename (`users.py`), a
+   `` `backticked` `` token, a `call()`, a `snake_case`/`dotted.path` symbol, or a
+   line number — the structural shape of pointing *at* code.
+
+This is deliberately **structural**, not a word list. The consequences:
+
+- **Clean sign-offs are not false positives.** "## Critical: all clear", "looks
+  good", "- Major: none of note" cite no code, so they are not located findings.
+  Scoring them as false positives would punish a reviewer for *correctly* declining
+  to flag clean code — the exact behaviour we want. There is **no absence/sign-off
+  vocabulary** to maintain (the recurring source of bypasses); the grounded
+  definition handles every phrasing for free.
+- **Vague, locationless severity assertions are unscored, not penalized.**
+  "## Critical: imagined bug" is not a falsifiable finding, so it is not a false
+  positive. A reviewer that only emits such prose also earns **zero catches**
+  (catches require grounding too), so it fails the benchmark on **recall** instead.
+  Precision and recall are a pair: "be vague to be safe" is a losing strategy.
+- **Placement dodges are closed structurally.** Because the *located reference* is
+  what is graded, a fabricated finding cannot escape by attaching a bare "none" in
+  any position ("Critical: none. SQL injection in `find_user_by_name`"); the
+  located reference is still asserted, so it still counts.
+- Minor/Nit suggestions on clean code are not penalized.
+
+A corpus-grounded companion check additionally flags the specific case where the
+located defect matches a *known planted defect* asserted on a control (reusing the
+catch logic directly), giving a precise per-defect message.
 
 ## Layout
 
@@ -255,18 +294,22 @@ They are why this is gated as a proof of concept rather than wired into CI today
   behavior we want. Mitigations for a trusted version: opaque/rotating fixture ids
   (the harness already withholds the id and uses a random per-run token), a private
   held-out corpus, and periodic fixture rotation.
-- **False-positive scoring uses two detectors.** On a control the benchmark counts
-  false positives as the union of (1) a **grounded** detector — a finding that
-  asserts a *real corpus defect* (the same located, non-negated phrase that would
-  count as a catch on the planted fixture) is a fabricated finding, because the
-  control contains none of those defects; and (2) a **heuristic** detector for
-  fabricated severity assertions that match no planted defect (line-leading or
-  inline-bolded severity labels, incl. markdown headings), which surfaces the
-  offending lines for human confirmation. The grounded detector reuses the catch
-  logic, so a gaming reviewer cannot dodge the precision gate by attaching an
-  "absence" word ("Critical: none. SQL injection in …") to a genuine located
-  finding — the located phrase is still counted. Minor/Nit suggestions on clean
-  code are not penalized, and a clean "no issues found" dismissal scores zero.
+- **False-positive scoring is grounded, not a word list.** On a control the
+  benchmark counts a false positive only for a fabricated **located** finding: a
+  Major/Critical severity assertion plus a non-negated code-location reference
+  (see [What counts as a false positive](#what-counts-as-a-false-positive)). This
+  is the *same* grounding the catch side uses, so the precision gate and the recall
+  gate share one principle. A corpus-grounded companion (`find_fabricated_findings`)
+  additionally flags the case where the located defect matches a *real planted
+  defect* — the same located, non-negated phrase that would count as a catch on the
+  planted fixture — which is the primary anti-gaming guard: attaching an "absence"
+  word ("Critical: none. SQL injection in `find_user_by_name` …") cannot suppress
+  it, because the located reference is still graded. Crucially, there is **no
+  absence/sign-off vocabulary** anywhere: a clean sign-off naming no code ("##
+  Critical: all clear") is simply not a located finding, so it is never a false
+  positive. A purely vague, locationless severity claim is unscored as a false
+  positive (it is unfalsifiable) — but such a reviewer scores zero catches and
+  fails on recall instead. Minor/Nit suggestions on clean code are not penalized.
 - **Negation handling is shallow.** A short window before the phrase is scanned for
   negation cues; unusual phrasing ("hardly a real injection") may slip through.
   Phrase specificity and location grounding are the primary defenses; negation is a

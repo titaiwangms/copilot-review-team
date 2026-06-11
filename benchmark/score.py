@@ -49,28 +49,28 @@ _NEGATION_WINDOW_CHARS = 30
 
 # Clause/sentence boundaries. A negation cue only suppresses a phrase when it sits
 # in the SAME clause as that phrase. A negation belonging to an earlier sentence
-# ("No lint issues. **Critical**: SQL injection") must not reach across the
-# boundary and wrongly suppress the later finding.
+# ("No lint issues. command injection in archive_path") must not reach across the
+# boundary and wrongly suppress the later finding. Used ONLY by the catch-side
+# negation guard (_is_negated); it is generic punctuation, NOT absence vocabulary.
 _CLAUSE_BOUNDARY_RE = re.compile(r"[.;!?\n]")
 
-# A line-leading severity label is a clean "bill of health" (NOT a false positive)
-# only when the clause right after it is ENTIRELY an absence statement — e.g.
-# "Critical issues: none found", "- Major: none". The match is anchored end-to-end
-# so a real located finding cannot dodge the FP count by appending OR prepending a
-# bare absence cue ("Critical: <finding>; none." / "Critical: none — <finding>"):
-# such a clause carries substantive content beyond the absence cue and so is still
-# counted as the false positive it is on a control.
-_DISMISSAL_CLAUSE_RE = re.compile(
-    r"(?i)^\s*[:\-]?\s*"
-    r"(?:(?:critical|major|security|other|known|additional)\s+)*"
-    r"(?:issues?|concerns?|problems?|findings?|defects?|bugs?|vulnerabilit\w+)?"
-    r"\s*[:\-]?\s*"
-    r"(?:are|were|is|was)?\s*"
-    r"(?:none|nothing|n/?a|"
-    r"not\s+(?:found|present|detected|identified)|"
-    r"no\s+(?:issues?|concerns?|problems?|findings?|defects?|bugs?|vulnerabilit\w+))"
-    r"(?:\s+(?:found|present|detected|identified|noted|here|observed))?"
-    r"\s*[.!]*\s*$"
+# A structural reference to a concrete code location — what a real, grounded
+# finding points AT (and what this repo's reviewers are told to cite): a filename,
+# a `backticked` token, a call(), a snake_case symbol, a dotted.path, or a line
+# number. This is the FALSE-POSITIVE analogue of the catch side's location_tokens:
+# an FP is a fabricated finding that names a defect AT a code location on clean
+# code. It is deliberately STRUCTURAL (punctuation/shape, case-sensitive) rather
+# than a word list — a clean sign-off ("Critical: all clear", "looks good", "none
+# of note") cites no code, so it is not a located finding and not a false positive,
+# with no absence/sign-off vocabulary to maintain. (A global re.IGNORECASE would
+# collapse the camel/snake structure into "any letters", so casing is intentional.)
+_CODE_LOCATION_RE = re.compile(
+    r"`[^`\n]+`"                                            # `backticked code`
+    r"|\b\w+\.(?:py|js|ts|jsx|tsx|go|rb|java|c|cc|cpp|cs|h|hpp|rs|sh|sql|ya?ml|json)\b"
+    r"|\b[A-Za-z_]\w*\([^)]*\)"                             # call(...)
+    r"|\b[A-Za-z_]\w*_\w+\b"                                # snake_case symbol
+    r"|\b[A-Za-z_]\w*\.[A-Za-z_]\w+\b"                      # dotted.path
+    r"|\bline\s+\d+\b|:\d+\b"                               # line 42 / :42
 )
 
 # A clean-control finding is treated as a false positive only when the reviewer
@@ -123,6 +123,25 @@ def _is_grounded(block, phrase_index, phrase_length, location_tokens):
     end = phrase_index + phrase_length + PROXIMITY_CHARS
     window = block[start:end]
     return any(token in window for token in location_tokens)
+
+
+def _has_located_finding(line):
+    """True if `line` cites a concrete code location in a non-negated context.
+
+    This is the false-positive analogue of the catch side's grounding: a real
+    finding points AT code (a filename, `backticked` token, call(), snake_case
+    symbol, dotted.path, or line number), not just at prose. A clean sign-off
+    ("Critical: all clear", "looks good", "none of note") names no code, so it is
+    not a located finding. A NEGATED reference ("no SQL injection in
+    find_user_by_name — it is parameterized") is the reviewer correctly DECLINING
+    to flag, reusing the same clause-local negation guard as the catch side, so it
+    is not a located finding either.
+    """
+    lowered = line.lower()
+    for match in _CODE_LOCATION_RE.finditer(line):
+        if not _is_negated(lowered, match.start()):
+            return True
+    return False
 
 
 def load_fixture(fixture_dir):
@@ -217,31 +236,36 @@ def defect_is_caught(defect, review_text, fixture_id=""):
 
 
 def find_false_positive_findings(review_text):
-    """Return the reviewer lines that look like Major/Critical findings.
+    """Return the reviewer lines that assert a fabricated LOCATED finding.
 
-    Used only on a control. This is a transparent heuristic, not ground truth: it
-    surfaces lines that ASSERT a Major/Critical finding (line-leading severity
-    labels incl. markdown headings, plus inline **emphasized** ones) so a human can
-    confirm them. A severity label in a NON-negated context counts; a dismissal
-    does not. The inline path reuses the catch side's clause-local negation guard;
-    the line-leading path treats a label as a clean "bill of health" only when the
-    clause right after it is ENTIRELY an absence statement ("## Critical issues:
-    none found", "- Major: none"). Because that match is anchored, a real located
-    finding cannot dodge the count by appending OR prepending a bare absence cue
-    ("Critical: <finding>; none." / "Critical: none — <finding>"). See the README's
-    "Known limitations".
+    Used only on a control. A false positive is the reviewer asserting a concrete
+    defect AT a code location on clean code, so a line counts here only when it has
+    BOTH (1) a Major/Critical severity assertion — line-leading (incl. markdown
+    headings/bullets) or inline **emphasized** — in a non-negated context, AND
+    (2) a non-negated structural code-location reference (`_has_located_finding`:
+    filename, `backticked` token, call(), snake_case/dotted symbol, line number).
+
+    This unifies the precision gate with the catch side on ONE principle —
+    GROUNDED, LOCATED findings — with no absence/sign-off vocabulary. A natural
+    clean sign-off ("## Critical: all clear", "looks good", "- Major: none of
+    note") cites no code, so it is correctly NOT a false positive (scoring it as
+    one would punish correct behavior on clean code). Conversely, a fabricated
+    located defect ("Critical: SQL injection in find_user_by_name in users.py")
+    counts no matter where a bare "none" is placed, because the located reference
+    is what is graded — closing the placement-dodge class structurally rather than
+    by patching an absence regex. A purely vague, LOCATIONLESS assertion ("Critical:
+    imagined bug") is unscored here: it is not falsifiable as a finding, and such a
+    reviewer earns zero catches (catches also require grounding), so it fails the
+    benchmark on RECALL instead. See benchmark/README.md "What counts as a false
+    positive". The corpus-grounded companion (`find_fabricated_findings`) flags the
+    specific case where the located defect matches a known planted defect.
     """
     matches = []
     for line in review_text.splitlines():
+        if not _has_located_finding(line):
+            continue
         leading = FALSE_POSITIVE_SEVERITY_RE.match(line)
         if leading:
-            # The clause IMMEDIATELY after the severity label decides
-            # dismissal-vs-finding; it is a dismissal only when that clause is
-            # entirely an absence statement (anchored), so appended/prepended
-            # absence cues on a real finding cannot suppress the false positive.
-            first_clause = _CLAUSE_BOUNDARY_RE.split(line[leading.end(1):], 1)[0]
-            if _DISMISSAL_CLAUSE_RE.match(first_clause):
-                continue
             matches.append(line.strip())
             continue
         inline = _INLINE_FALSE_POSITIVE_RE.search(line)
@@ -272,12 +296,16 @@ def score_fixture(fixture, review_text, corpus_defects=None):
     """Score a single reviewer output against one fixture.
 
     Returns a dict describing caught/missed defects and (for the clean control)
-    false-positive finding lines. On a control, false positives are the UNION of
-    two detectors: (1) fabricated severity assertions that match no real defect
-    (the line-leading/inline heuristic) and (2) grounded findings that assert a
-    REAL corpus defect on clean code (`corpus_defects`, when provided). The second
-    detector reuses the catch logic, so a gaming reviewer cannot dodge the
-    precision gate by attaching an "absence" word to a genuine located finding.
+    false-positive finding lines. On a control, both false-positive signals share
+    ONE grounding principle (located findings, not absence vocabulary): (1)
+    `find_false_positive_findings` — a severity assertion plus a non-negated
+    code-location reference (a fabricated LOCATED finding on clean code); and (2)
+    `find_fabricated_findings` — the corpus-grounded companion that reuses the catch
+    logic to flag the specific case where the located defect matches a REAL planted
+    defect (`corpus_defects`, when provided). Because both grade the located
+    reference, a gaming reviewer cannot dodge the precision gate by attaching an
+    "absence" word, and a clean sign-off that names no code is never a false
+    positive.
     """
     caught = []
     missed = []
