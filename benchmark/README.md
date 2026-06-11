@@ -310,6 +310,18 @@ They are why this is gated as a proof of concept rather than wired into CI today
   positive. A purely vague, locationless severity claim is unscored as a false
   positive (it is unfalsifiable) — but such a reviewer scores zero catches and
   fails on recall instead. Minor/Nit suggestions on clean code are not penalized.
+- **The precision gate measures GROUNDED fabrication only (deliberate narrowing).**
+  Under the grounded precision gate, a false positive is a fabricated finding that
+  asserts a concrete, located defect on clean code. A control review that splatters
+  **non-grounded** fabricated severity assertions (e.g. "Critical: the widget is
+  misaligned" — matching no planted defect and citing no code location) will **not**
+  count as a false positive and will **not** trip the gate. This is a conscious
+  tradeoff, not an oversight: the gate scores grounded fabrication only. It is
+  acceptable for this POC measurement primitive because non-grounded noise also
+  cannot boost catch-rate (catches require grounding too), so it is net-neutral to
+  the score. A future hardening — **before** wiring the false-positive count to
+  CI / the issue #10 comparison — may extend the gate to also penalize ungrounded
+  severity-splatter.
 - **Negation handling is shallow.** A short window before the phrase is scanned for
   negation cues; unusual phrasing ("hardly a real injection") may slip through.
   Phrase specificity and location grounding are the primary defenses; negation is a
