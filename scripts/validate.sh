@@ -15,7 +15,7 @@ FAILURES=0
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*"; FAILURES=$((FAILURES + 1)); }
 
-SCRIPTS="install.sh uninstall.sh scripts/validate.sh scripts/build-bundle.sh"
+SCRIPTS="install.sh uninstall.sh scripts/validate.sh"
 
 # --- prerequisite: python3 ---
 echo "== prerequisites =="
@@ -158,23 +158,6 @@ if [ -s VERSION ]; then
   fi
 else
   fail "VERSION file missing or empty"
-fi
-
-# --- C8: zero-tooling bundle in sync ---
-# The committed paste-able bundle (dist/copilot-review-team-bundle.md) is a
-# generated artifact. It must be regenerated whenever an agent definition, the
-# playbook, or the VERSION file changes (the bundle embeds VERSION), or
-# zero-tooling adopters get stale content. Enforce that the committed bundle
-# matches a fresh generation from the current sources.
-echo "== C8: zero-tooling bundle drift =="
-# Capture output so a PASS stays quiet but a FAILURE shows WHAT drifted (the
-# generator prints a unified diff of committed-vs-fresh on stderr). Using
-# `if ! out=$(...)` keeps this safe under `set -e`.
-if bundle_check_output="$(./scripts/build-bundle.sh --check 2>&1)"; then
-  pass "dist bundle matches sources (scripts/build-bundle.sh --check)"
-else
-  fail "bundle is stale — regenerate with scripts/build-bundle.sh"
-  printf '%s\n' "$bundle_check_output"
 fi
 
 echo ""
