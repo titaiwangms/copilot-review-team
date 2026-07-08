@@ -1,7 +1,7 @@
 ---
 name: local-qa-tester
 description: "Runs the actual code end-to-end. Verifies behavior. Catches runtime failures static review cannot detect."
-model: claude-sonnet-4.6
+model: claude-sonnet-5
 tools:
   - read
   - edit
@@ -94,8 +94,6 @@ You are the LAST line of defense before work is considered done.
 
 - Do not write the production code — that's the developer's job
 - You may write minimal repro scripts or temporary test scaffolding *outside* the project's test directories to demonstrate a bug — clean them up after
-
----
 
 ## Operating context
 
