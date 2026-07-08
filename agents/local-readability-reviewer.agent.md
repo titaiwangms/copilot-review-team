@@ -1,7 +1,7 @@
 ---
 name: local-readability-reviewer
 description: "Reviews naming, organization, simplicity, and documentation. Asks: could a new developer understand this fast?"
-model: claude-sonnet-4.6
+model: claude-sonnet-5
 tools:
   - read
   - search
@@ -45,8 +45,6 @@ If you weren't given a diff, can't locate the changed files, or the changes are 
 
 - Do not duplicate the Code Reviewer (correctness/patterns) or Critical Reviewer (security/architecture) — stay in your lane
 - Do not modify code yourself unless explicitly asked to demonstrate a fix
-
----
 
 ## Operating context
 
