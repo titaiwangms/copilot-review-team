@@ -1,7 +1,7 @@
 ---
 name: local-qa-tester
 description: "Runs the actual code end-to-end. Verifies behavior. Catches runtime failures static review cannot detect."
-model: claude-sonnet-5
+model: claude-opus-4.8
 tools:
   - read
   - edit

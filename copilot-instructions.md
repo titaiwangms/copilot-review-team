@@ -180,8 +180,10 @@ model's blind spots:
 - Integration Reviewer is **Gemini 3.1 Pro** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window makes it the natural fit
   for wide cross-module/whole-codebase consistency review)
-- QA Tester is **Claude sonnet** (it runs the code and reports failures — execution and
-  repro, not adversarial reading, so model family isn't critical for this role)
+- QA Tester is **Claude Opus 4.8** (it runs the code, authors repros, brings up cold/
+  misconfigured builds, and drives sanitizers/benchmarks — an agentic-reasoning-heavy
+  instrument role. Family diversity isn't the point here; tool-use strength is, so it gets
+  the strongest agentic model rather than a cheaper log-reader)
 
 If you change a model, preserve the cross-family spread across the adversarial
 reviewers — that's the main source of review value.
