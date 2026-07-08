@@ -60,7 +60,7 @@ are read from those files.
 | `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.5` | Second cross-family adversary — different blind spots from the author |
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-4.8` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
 | `local-integration-reviewer` | Cross-module wiring, contract drift, ripple effects, whole-codebase consistency | `gemini-3.1-pro-preview` | Third model family + large context window for wide cross-module review |
-| `local-qa-tester` | Runs the actual code; reports failures with repro steps | `claude-sonnet-5` | Execution and repro, not adversarial reading — family isn't critical here |
+| `local-qa-tester` | Runs the actual code; reports failures with repro steps | `claude-opus-4.8` | Authoring repros, cold-env build bring-up, and driving sanitizers/benchmarks is agentic-reasoning-heavy — not mere log reading — so it gets the strongest tool-use model |
 
 The `local-` prefix is a namespace convention marking these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you
