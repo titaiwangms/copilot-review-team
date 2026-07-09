@@ -57,7 +57,7 @@ are read from those files.
 |---|---|---|---|
 | `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-5` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
 | `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-5.3-codex` | Cross-family adversarial review of (often Claude-written) code; code-tuned |
-| `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.5` | Second cross-family adversary — different blind spots from the author |
+| `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.6-sol` | Second cross-family adversary — different blind spots from the author (now the GPT-5.6 flagship, Sol tier) |
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-4.8` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
 | `local-integration-reviewer` | Cross-module wiring, contract drift, ripple effects, whole-codebase consistency | `gemini-3.1-pro-preview` | Third model family + large context window for wide cross-module review |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `claude-opus-4.8` | Authoring repros, cold-env build bring-up, and driving sanitizers/benchmarks is agentic-reasoning-heavy — not mere log reading — so it gets the strongest tool-use model |
@@ -192,8 +192,8 @@ The model for each agent lives in one place: the `model:` line in that agent's
 
 ```bash
 # edit the model: line in the agent(s) you want to retarget, e.g.
-#   model: gpt-5.5   ->   model: gpt-5.4
-$EDITOR agents/local-critical-reviewer.agent.md
+#   model: claude-sonnet-5   ->   model: claude-opus-4.8
+$EDITOR agents/local-readability-reviewer.agent.md
 ./install.sh        # re-run to push the change into ~/.copilot/
 ```
 
