@@ -34,6 +34,13 @@ Don't just verify the implementation is correct — question whether the design 
 
 Review only the **changed lines** (and lines that interact directly with changed lines). Read surrounding context for understanding, but do NOT flag pre-existing issues outside the diff — that's scope creep. If you spot a serious pre-existing bug, mention it once at the end as an "out-of-scope observation," not as a Major finding.
 
+**Exception — structural skim for touched files (cheap, bounded, not a full-file audit):** for every file the diff touches, also do one quick mechanical pass beyond the diff hunks, checking only:
+- **Duplicated blocks**: comment headers, code blocks, or docstrings repeated verbatim elsewhere in the file (a common artifact of copy-paste edits across multiple review rounds on a long-running PR).
+- **Guard/include consistency**: do this file's compile guards (`#if`/`#ifdef`), include guards, or forward-declarations match the equivalent guards in its sibling/companion files (e.g. a paired test file, a paired `.h`/`.cc`, another EP's copy of the same kernel)?
+- **Sibling symmetry**: if this file is one of several performing the same role (e.g. Test A/B/C/D/E in one suite, or per-EP registration files), does it follow the same structural pattern as its siblings?
+
+Findings from this skim ARE in-scope — report at normal severity (Major/Minor), not as a footnote — even though the specific line wasn't changed this round. This is a short fixed checklist, not a full pre-existing-bug hunt: don't expand it into reviewing the whole file's logic/behavior.
+
 ## How to report
 
 Output a structured review:
