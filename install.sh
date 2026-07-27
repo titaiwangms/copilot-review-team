@@ -102,9 +102,10 @@ is_safe_agent_name() {
 # Write $1 (a source file) to $2 (target inside $AGENTS_DIR) safely. If $target
 # is a symlink we must NOT follow it: `cp` would dereference and clobber the
 # referent (which could live OUTSIDE $AGENTS_DIR). We write to a temp file in the
-# same directory and `mv -T` it into place — atomic, and it replaces the link
-# itself rather than writing through it. Behavior for a regular-file target is
-# identical to a plain copy.
+# same directory and `mv` it into place — atomic, and (since $target is always
+# a fixed non-directory path here) it replaces the target itself rather than
+# writing through it, even without GNU's `-T`. Behavior for a regular-file
+# target is identical to a plain copy.
 install_file() {
   local src="$1" target="$2"
   local tmp mode
@@ -112,14 +113,20 @@ install_file() {
   cp "$src" "$tmp"
   # mktemp creates the temp file 0600; preserve the source file's mode instead
   # so installed agents aren't silently more restrictive than a plain copy.
-  # `stat`'s format flag differs between GNU (-c) and BSD/macOS (-f); try GNU
-  # first so this works on both without depending on GNU-only `chmod --reference`.
+  # `stat`'s format flag differs between GNU (-c %a) and BSD/macOS (-f %Lp);
+  # try GNU first so this works on both without GNU-only `chmod --reference`.
   mode="$(stat -c '%a' "$src" 2>/dev/null || stat -f '%Lp' "$src")"
   chmod "$mode" "$tmp"
-  # Plain `mv` (no GNU-only `-T`) still replaces $target itself rather than
-  # writing through it, even if $target is a symlink: as long as $target isn't
-  # itself a directory — which it never is here, these are fixed agent file
-  # paths — `mv` overwrites the path directly instead of following it.
+  # `mv` (no GNU-only `-T`) replaces $target itself rather than writing
+  # through a symlink — UNLESS $target resolves to a directory, in which case
+  # POSIX mv moves $tmp *inside* it instead of replacing it, silently
+  # "succeeding" at installing nothing. Refuse that case explicitly instead
+  # of relying on `-T`'s (GNU-only) behavior to fail safely.
+  if [ -d "$target" ]; then
+    echo "ERROR: expected a file at $target, found a directory; aborting install." >&2
+    rm -f "$tmp"
+    exit 1
+  fi
   mv "$tmp" "$target"
 }
 
@@ -216,6 +223,14 @@ manifest_tmp="$(mktemp "$(dirname "$MANIFEST")/.tmp-manifest.XXXXXX")"
     echo "AGENT=$(basename "$f")"
   done
 } > "$manifest_tmp"
+# Same directory-target guard as install_file(): if $MANIFEST resolves to a
+# directory, plain `mv` would move the temp file inside it instead of
+# replacing the manifest, silently leaving no manifest at the expected path.
+if [ -d "$MANIFEST" ]; then
+  echo "ERROR: expected a file at $MANIFEST, found a directory; aborting install." >&2
+  rm -f "$manifest_tmp"
+  exit 1
+fi
 mv "$manifest_tmp" "$MANIFEST"
 echo "  manifest: $(basename "$MANIFEST")"
 
