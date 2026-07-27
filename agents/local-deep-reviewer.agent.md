@@ -1,7 +1,7 @@
 ---
 name: local-deep-reviewer
 description: "Deep semantic review: spec adherence, mathematical correctness, multi-file invariants. Grounds claims in authoritative references."
-model: claude-opus-4.8
+model: claude-opus-5
 tools:
   - read
   - search
