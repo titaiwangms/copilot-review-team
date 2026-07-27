@@ -5,6 +5,7 @@ Run directly (`python3 scripts/_test_merge_playbook.py`) or via
 `python3 -m unittest scripts._test_merge_playbook`. Stdlib only. Exits 0 on pass.
 """
 import os
+import stat
 import sys
 import tempfile
 import unittest
@@ -171,6 +172,27 @@ class MergePlaybookTest(unittest.TestCase):
         mp.cmd_install(self.target, self.source)
         mp.cmd_remove(self.target)
         self.assertEqual(self.read_target_bytes(), original)
+
+    def test_install_preserves_existing_file_permissions(self):
+        # _atomic_write's temp-file-then-replace must not silently widen (or
+        # narrow) an existing target's mode to whatever the process umask
+        # would otherwise produce.
+        self.write_target("my own instructions\n")
+        os.chmod(self.target, 0o600)
+        mp.cmd_install(self.target, self.source)
+        self.assertEqual(stat.S_IMODE(os.stat(self.target).st_mode), 0o600)
+        mp.cmd_remove(self.target)
+        self.assertEqual(stat.S_IMODE(os.stat(self.target).st_mode), 0o600)
+
+    def test_install_new_file_gets_umask_default_mode(self):
+        # No pre-existing file to preserve the mode of; the temp file's
+        # umask-derived default mode should pass through untouched.
+        old_umask = os.umask(0o022)
+        try:
+            mp.cmd_install(self.target, self.source)
+        finally:
+            os.umask(old_umask)
+        self.assertEqual(stat.S_IMODE(os.stat(self.target).st_mode), 0o644)
 
     def test_install_rejects_marker_in_source(self):
         bad_source = os.path.join(self.dir, "bad_source.md")

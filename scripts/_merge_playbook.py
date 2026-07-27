@@ -25,6 +25,7 @@ block is a no-op. The only thing install adds (and remove reverses) is a single
 blank-line separator between the user's content and our block.
 """
 import os
+import stat
 import sys
 
 BEGIN = "# >>> copilot-review-team (managed — do not edit between markers) >>>"
@@ -107,12 +108,23 @@ def _atomic_write(path, content):
     The temp file is cleaned up if the write or the replace fails, so a failure
     never leaks a `.<name>.tmp-<pid>` file in the user's directory. Newlines are
     written verbatim (newline="") — the caller has already chosen the EOL style.
+
+    If `path` already exists, the temp file's permission bits are set to match
+    it before the replace: `open(..., "w")` creates a new file at whatever mode
+    the process umask allows, which can silently widen or narrow the original
+    file's permissions (e.g. a `0600` instructions file becoming `0644`).
     """
     directory = os.path.dirname(os.path.abspath(path)) or "."
     tmp = os.path.join(directory, ".%s.tmp-%d" % (os.path.basename(path), os.getpid()))
     try:
         with open(tmp, "w", encoding="utf-8", newline="") as handle:
             handle.write(content)
+        try:
+            mode = os.stat(path).st_mode
+        except OSError:
+            pass  # path doesn't exist yet; keep the temp file's default mode
+        else:
+            os.chmod(tmp, stat.S_IMODE(mode))
         os.replace(tmp, path)
     except BaseException:
         try:
