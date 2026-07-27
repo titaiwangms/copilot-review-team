@@ -137,7 +137,10 @@ for name in "${remove_list[@]}"; do
     continue
   fi
   target="$AGENTS_DIR/$name"
-  if [ -e "$target" ]; then
+  # `-e` alone follows symlinks and is false for a broken link (dangling
+  # target), which would silently skip removal; `-L` catches that case too,
+  # mirroring the existence check install.sh itself relies on.
+  if [ -e "$target" ] || [ -L "$target" ]; then
     run rm -f "$target"
     if [ "$DRY_RUN" -eq 1 ]; then
       echo "  would remove agent: $name"

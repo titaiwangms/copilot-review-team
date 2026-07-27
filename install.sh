@@ -107,13 +107,20 @@ is_safe_agent_name() {
 # identical to a plain copy.
 install_file() {
   local src="$1" target="$2"
-  local tmp
+  local tmp mode
   tmp="$(mktemp "$(dirname "$target")/.tmp-agent.XXXXXX")"
   cp "$src" "$tmp"
   # mktemp creates the temp file 0600; preserve the source file's mode instead
   # so installed agents aren't silently more restrictive than a plain copy.
-  chmod --reference="$src" "$tmp"
-  mv -T "$tmp" "$target"
+  # `stat`'s format flag differs between GNU (-c) and BSD/macOS (-f); try GNU
+  # first so this works on both without depending on GNU-only `chmod --reference`.
+  mode="$(stat -c '%a' "$src" 2>/dev/null || stat -f '%Lp' "$src")"
+  chmod "$mode" "$tmp"
+  # Plain `mv` (no GNU-only `-T`) still replaces $target itself rather than
+  # writing through it, even if $target is a symlink: as long as $target isn't
+  # itself a directory — which it never is here, these are fixed agent file
+  # paths — `mv` overwrites the path directly instead of following it.
+  mv "$tmp" "$target"
 }
 
 # --- Agent source directory ---
@@ -197,6 +204,10 @@ echo "  playbook: merged managed block into copilot-instructions.md"
 
 # --- Manifest ---
 # Record exactly what we installed so uninstall.sh can clean up precisely.
+# Write through a temp file + `mv` (same pattern as install_file() above)
+# instead of `> "$MANIFEST"`, which would follow a symlinked manifest path
+# and clobber whatever it points at instead of replacing the manifest itself.
+manifest_tmp="$(mktemp "$(dirname "$MANIFEST")/.tmp-manifest.XXXXXX")"
 {
   echo "# Manifest written by install.sh; read by uninstall.sh. Do not edit by hand."
   echo "VERSION=$NEW_VERSION"
@@ -204,7 +215,8 @@ echo "  playbook: merged managed block into copilot-instructions.md"
   for f in "$AGENT_SRC_DIR"/local-*.agent.md; do
     echo "AGENT=$(basename "$f")"
   done
-} > "$MANIFEST"
+} > "$manifest_tmp"
+mv "$manifest_tmp" "$MANIFEST"
 echo "  manifest: $(basename "$MANIFEST")"
 
 if [ -d "$BACKUP_DIR" ]; then
