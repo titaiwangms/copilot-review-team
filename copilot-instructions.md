@@ -180,7 +180,7 @@ model's blind spots:
 - Integration Reviewer is **Gemini 3.1 Pro** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window makes it the natural fit
   for wide cross-module/whole-codebase consistency review)
-- QA Tester is **`gpt-5.6-sol`** (it runs the code, authors repros, brings up cold/
+- QA Tester is **GPT-5.6 Sol** (it runs the code, authors repros, brings up cold/
   misconfigured builds, and drives sanitizers/benchmarks — an agentic-reasoning-heavy
   instrument role. Family diversity isn't the point here; tool-use strength is, so it gets
   a strong agentic model rather than a cheaper log-reader)
