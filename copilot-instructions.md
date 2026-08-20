@@ -177,7 +177,7 @@ model's blind spots:
 - Deep Reviewer is **Claude Opus 5** (strong base model for spec adherence, math, and
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
   math/spec claim)
-- Integration Reviewer is **Gemini 3.1 Pro** (third model family — a fresh blind-spot
+- Integration Reviewer is **Grok 4.6** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window makes it the natural fit
   for wide cross-module/whole-codebase consistency review)
 - QA Tester is **GPT-5.6 Sol** (it runs the code, authors repros, brings up cold/

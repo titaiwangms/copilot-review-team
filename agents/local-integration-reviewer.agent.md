@@ -1,7 +1,7 @@
 ---
 name: local-integration-reviewer
 description: "Large-context integration review: cross-module consistency, ripple effects, contract drift across the whole codebase."
-model: gemini-3.1-pro-preview
+model: grok-4.6
 tools:
   - read
   - search
