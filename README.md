@@ -24,11 +24,11 @@ so you can weigh them rather than trust an undifferentiated verdict.
 ## Model-family diversity (and why it matters)
 
 The reviewers run across **three model families on purpose — Claude, GPT, and
-Gemini.** Different families have different blind spots, so reviewing a change with
+Grok.** Different families have different blind spots, so reviewing a change with
 an *adversarial reviewer in a different family than the code's author* catches
 things a same-family reviewer would wave through. The GPT reviewers are the
 adversarial pair; the deep reviewer (Claude) is the spec/math tie-breaker; the
-integration reviewer (Gemini) brings a third blind-spot set and a large context
+integration reviewer (Grok) brings a third blind-spot set and a large context
 window for whole-repo consistency.
 
 If you swap models, keep the adversarial reviewers spread across families — that
@@ -59,7 +59,7 @@ are read from those files.
 | `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-5.3-codex` | Cross-family adversarial review of (often Claude-written) code; code-tuned |
 | `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.6-sol` | Second cross-family adversary — different blind spots from the author (now the GPT-5.6 flagship, Sol tier) |
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
-| `local-integration-reviewer` | Cross-module wiring, contract drift, ripple effects, whole-codebase consistency | `gemini-3.1-pro-preview` | Third model family + large context window for wide cross-module review |
+| `local-integration-reviewer` | Cross-module wiring, contract drift, ripple effects, whole-codebase consistency | `grok-4.6` | Third model family + large context window for wide cross-module review |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-5.6-sol` | Authoring repros, cold-env build bring-up, and driving sanitizers/benchmarks is agentic-reasoning-heavy — not mere log reading — so it gets a strong agentic tool-use model |
 
 The `local-` prefix is a namespace convention marking these as user-installed
@@ -135,7 +135,7 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
   [github/copilot-cli](https://github.com/github/copilot-cli)
   (typically `npm install -g @github/copilot`, then run `copilot`).
 - A Copilot plan whose account can access multiple model families (Claude / GPT /
-  Gemini). If yours can't, swap the model IDs (see [Customization](#customization)).
+  Grok). If yours can't, swap the model IDs (see [Customization](#customization)).
 - To see which model IDs your account can use, run `/model` inside a `copilot`
   session, then match the agent `model:` fields to that list.
 - `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
