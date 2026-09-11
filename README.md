@@ -2,15 +2,29 @@
 
 [![validate](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml/badge.svg)](https://github.com/titaiwangms/copilot-review-team/actions/workflows/validate.yml)
 
-A drop-in **multi-agent code-review team** for
+A drop-in **multi-agent code-review system** for
 [GitHub Copilot CLI](https://github.com/github/copilot-cli). Point it at a PR, a
-diff, or a set of changed files and it fans the change out to five specialized
-reviewers and a QA tester — spread across three model families — then
-synthesizes their findings by severity into one report.
+diff, or a set of changed files and it defaults to a fast two-agent lightweight
+review. Risky or escalated changes fan out to five specialized reviewers and a
+QA tester spread across three model families.
 
-Instead of one model reviewing everything, the lead Copilot agent delegates to a
-team of focused sub-agents — **five reviewers + a QA tester** — wired together by a
-**playbook** into a review → synthesize → (loop) → report pipeline.
+The playbook provides two deliberately separate paths:
+
+- **Lightweight team:** MAI-Code-1.1-Flash checks implementation correctness while
+  Claude Sonnet 5 checks semantic and adversarial risk.
+- **Full team:** five deep specialists plus an optional QA tester handle risky,
+  wide, or escalated changes.
+
+## Why two review depths
+
+Routine coding feedback should be fast enough to run after development without
+turning every change into a premium-model tax. The lightweight pair uses bounded
+context, reports at most three concrete findings each, and escalates instead of
+expanding into a repository audit.
+
+High-risk changes still need specialist depth. The full team covers clarity,
+function-level correctness, adversarial security and architecture, spec/math
+adherence, and cross-module integration.
 
 ## Why multi-agent review (not one model)
 
@@ -23,13 +37,11 @@ so you can weigh them rather than trust an undifferentiated verdict.
 
 ## Model-family diversity (and why it matters)
 
-The reviewers run across **three model families on purpose — Claude, GPT, and
-Grok.** Different families have different blind spots, so reviewing a change with
-an *adversarial reviewer in a different family than the code's author* catches
-things a same-family reviewer would wave through. The GPT reviewers are the
-adversarial pair; the deep reviewer (Claude) is the spec/math tie-breaker; the
-integration reviewer (Grok) brings a third blind-spot set and a large context
-window for whole-repo consistency.
+The lightweight pair uses **MAI + Claude**, providing two distinct model-family
+perspectives without paying for a full fan-out. The full team runs across
+**Claude, GPT, and Grok**: GPT supplies the adversarial pair, Claude handles
+clarity and deep spec/math reasoning, and Grok is reserved for whole-repository
+integration tracing.
 
 If you swap models, keep the adversarial reviewers spread across families — that
 spread is the main source of review value.
@@ -39,15 +51,13 @@ spread is the main source of review value.
 The playbook defines the full tiers; quick version:
 
 - **Trivial** (typo, one-liner, doc-only): the lead reads it; no team.
-- **Small** (one file, well-defined): a reviewer or two.
-- **Medium** (a few files): full reviewer fan-out; add the QA tester if behavior
-  needs running.
-- **Large / risky** (multi-file, security-sensitive, ambiguous): full fan-out +
-  QA tester, with a second loop if findings warrant.
+- **Routine** (bounded scope, no escalation trigger): lightweight pair.
+- **Risky or wide**: full reviewer fan-out; add the QA tester only when runtime
+  evidence is needed.
 
 You can always steer it: *"just review the security"*, *"skip the QA tester"*, etc.
 
-## The team
+## The teams
 
 Each agent's model is the `model:` line in its own
 `agents/local-*.agent.md` frontmatter (the single source of truth). The IDs below
@@ -55,6 +65,8 @@ are read from those files.
 
 | Agent | Role | Model | Why this model |
 |---|---|---|---|
+| `local-lightweight-code-review` | Fast implementation correctness, tests, and direct callers | `mai-code-1.1-flash` | Low-latency coding specialist for routine real-time review |
+| `local-lightweight-risk-review` | Fast semantic intent, failure modes, and local contracts | `claude-sonnet-5` | Strong reasoning and a different family from a GPT developer |
 | `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-5` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
 | `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-5.3-codex` | Cross-family adversarial review of (often Claude-written) code; code-tuned |
 | `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.6-sol` | Second cross-family adversary — different blind spots from the author (now the GPT-5.6 flagship, Sol tier) |
@@ -69,7 +81,9 @@ add must follow that naming to be picked up.
 ## What's in here
 
 ```
-agents/                       6 sub-agent definitions
+agents/                       8 sub-agent definitions
+  local-lightweight-code-review.agent.md  Fast implementation review
+  local-lightweight-risk-review.agent.md  Fast semantic/adversarial review
   local-readability-reviewer.agent.md  Naming, clarity, organization, docs
   local-code-reviewer.agent.md         Correctness, idiom, patterns, test quality
   local-critical-reviewer.agent.md     Adversarial: bugs, security, perf, edge cases, structural design
@@ -88,19 +102,51 @@ scripts/validate.sh           Repo self-checks (run before submitting a PR; also
 
 ## How the review pipeline works
 
-When you ask the lead to **"review &lt;PR url or number&gt;"** (or hand it a diff):
+After code is written, or when you ask the lead to
+**"review &lt;PR url or number&gt;"**:
 
 1. **Fetch / frame** the change and do a quick read-through.
-2. **Parallel fan-out** — all five reviewers run in parallel, at once, each getting the
-   diff inline plus role-specific framing. (The QA tester joins only when running
-   the code is warranted — review-only ≠ run the code.)
-3. **Severity synthesis** — findings are deduplicated and prioritized
+2. **Route** — routine changes run MAI + Sonnet lightweight review in parallel.
+   Changes already matching an escalation trigger skip directly to the full team.
+3. **Handle the verdict**:
+   - Combine parallel results using `ESCALATE > FINDINGS > PASS`.
+   - `PASS`: run the smallest relevant validation and finish.
+   - `FINDINGS`: for implementation work, fix and re-run only the lightweight
+     agent whose finding was affected. For review-only requests, report the
+     finding and wait for a revised diff.
+   - `ESCALATE`: preserve both reports' trigger, reason, evidence, findings, and
+     exclusions, then run the full five-reviewer team. Lightweight escalation is
+     a routing handoff inside the current round, not an additional completed round.
+4. **Full fan-out when needed** — all five full reviewers run in parallel. The QA
+   tester joins only when runtime evidence is warranted.
+5. **Severity synthesis** — findings are deduplicated and prioritized
    Critical → Major → Minor → Nit, with a **findings ledger** recording who raised
-   each Critical/Major finding and its disposition.
-4. **Loop** — for large/risky changes, re-review what changed (max 2 rounds).
-5. **Final report** — the synthesis, plus a **minority report** (anything the lead
-   overruled, with who raised it) and a **residual-risk / exclusions statement**
-   (what was *not* checked). Posting to the PR happens only if you ask.
+   each Critical/Major full-team finding and its disposition.
+6. **Loop** — re-review only affected areas, with a global maximum of two
+   completed review rounds. If a lightweight pass escalates, the full-team pass
+   completes that same round; escalation does not reset the count. If round one
+   reached the full team, round two is a targeted full-team re-review. The cap
+   applies per diff revision.
+7. **Final report** — lightweight review includes any one-line minority note
+   for an overruled Major. Full review also includes the findings ledger, full
+   **minority report**, and a **residual-risk / exclusions statement**. Posting
+   to the PR happens only if you ask.
+
+For review-only requests, the lead never edits code. The author supplies a
+revised diff before another review cycle begins.
+
+### Escalation triggers
+
+Use the full team immediately, or escalate from lightweight review, for:
+
+- authentication, authorization, secrets, cryptography, or untrusted input
+- destructive persistence, migrations, or data-format compatibility
+- public APIs, schemas, wire/event formats, ABI, or serialization
+- concurrency, locking, or resource lifecycles
+- external specifications, numerical proofs, or bit-level invariants
+- changes requiring transitive tracing beyond direct consumers
+- runtime behavior that cannot be settled by reading
+- a possible Critical issue, or scope/intent that cannot be bounded confidently
 
 ### Severity levels
 
@@ -134,8 +180,9 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
 - **GitHub Copilot CLI** installed and working — see
   [github/copilot-cli](https://github.com/github/copilot-cli)
   (typically `npm install -g @github/copilot`, then run `copilot`).
-- A Copilot plan whose account can access multiple model families (Claude / GPT /
-  Grok). If yours can't, swap the model IDs (see [Customization](#customization)).
+- A Copilot plan whose account can access the configured model families (MAI /
+  Claude / GPT / Grok). If yours can't, swap the model IDs (see
+  [Customization](#customization)).
 - To see which model IDs your account can use, run `/model` inside a `copilot`
   session, then match the agent `model:` fields to that list.
 - `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
@@ -228,13 +275,12 @@ instructions layer on top of (and win over) your global ones.
 
 - **No extra servers, but your code does go to model providers.** This repo adds no
   server of its own — but Copilot CLI sends your prompts, diffs, and code context to
-  hosted model providers per your Copilot plan. A full review fan-out sends the same
-  diff to several model families. Don't treat it as an air-gapped/local-only setup;
-  for sensitive code, narrow the fan-out (fewer reviewers) accordingly.
-- **Cost & latency scale with the fan-out.** A full review can hit five reviewers
-  (plus a QA pass and a second loop) — many premium model calls per change,
-  multiplied by diff size. The "match depth to task size" guidance keeps this in
-  check.
+  hosted model providers per your Copilot plan. Lightweight review sends bounded
+  context to two providers; a full review sends the diff to several model families.
+  Don't treat it as an air-gapped/local-only setup.
+- **Cost & latency scale with the fan-out.** Routine work defaults to two bounded
+  review calls. Full review can still hit five reviewers plus QA, but only after
+  objective risk routing or escalation.
 - Tested with Copilot CLI. Requires an account with access to the referenced
   models (swap as needed).
 

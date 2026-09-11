@@ -65,6 +65,12 @@ else
   fail "playbook merge unit tests"
   printf '%s\n' "$merge_test_output"
 fi
+if tools_test_output="$(python3 scripts/_test_check_tools.py 2>&1)"; then
+  pass "tool policy unit tests (scripts/_test_check_tools.py)"
+else
+  fail "tool policy unit tests"
+  printf '%s\n' "$tools_test_output"
+fi
 
 # --- C3: team table roster matches agent files ---
 # Model IDs are single-source in each agent's frontmatter; there is no model
