@@ -40,11 +40,12 @@ so you can weigh them rather than trust an undifferentiated verdict.
 The lightweight pair uses **MAI + Claude**, providing two distinct model-family
 perspectives without paying for a full fan-out. The full team runs across
 **Claude, GPT, and Grok**: GPT supplies the adversarial pair, Claude handles
-clarity and deep spec/math reasoning, and Grok is reserved for whole-repository
-integration tracing.
+clarity and deep spec/math reasoning, and Grok is reserved for bounded cross-module
+producer/consumer tracing.
 
-If you swap models, keep the adversarial reviewers spread across families — that
-spread is the main source of review value.
+If you swap models, preserve strong independent family counterweights among the
+judgment-producing reviewers. No single family should dominate every lens or its
+own semantic tie-break.
 
 ## Match review depth to task size
 
@@ -68,10 +69,10 @@ are read from those files.
 | `local-lightweight-code-review` | Fast implementation correctness, tests, and direct callers | `mai-code-1.1-flash` | Low-latency coding specialist for routine real-time review |
 | `local-lightweight-risk-review` | Fast semantic intent, failure modes, and local contracts | `claude-sonnet-5` | Strong reasoning and a different family from a GPT developer |
 | `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-5` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
-| `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-5.3-codex` | Cross-family adversarial review of (often Claude-written) code; code-tuned |
-| `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.6-sol` | Second cross-family adversary — different blind spots from the author (now the GPT-5.6 flagship, Sol tier) |
+| `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-5.3-codex` | Code-tuned local implementation and test-quality lens |
+| `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.6-sol` | Strong architecture, security, and failure-mode adversary |
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
-| `local-integration-reviewer` | Cross-module wiring, contract drift, ripple effects, whole-codebase consistency | `grok-4.6` | Third model family + large context window for wide cross-module review |
+| `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `grok-4.6` | Third model family + large context window for producer/consumer analysis |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6-astra` | Long-horizon repro work, cold-env build bring-up, and driving sanitizers/benchmarks benefit from Astra's strong agentic tool use |
 
 The `local-` prefix is a namespace convention marking these as user-installed
@@ -88,7 +89,7 @@ agents/                       8 sub-agent definitions
   local-code-reviewer.agent.md         Correctness, idiom, patterns, test quality
   local-critical-reviewer.agent.md     Adversarial: bugs, security, perf, edge cases, structural design
   local-deep-reviewer.agent.md         Spec/math arbiter: multi-file invariants, tie-breaker
-  local-integration-reviewer.agent.md  Cross-module / whole-codebase consistency
+  local-integration-reviewer.agent.md  Bounded cross-module contract tracing
   local-qa-tester.agent.md             Actually runs the code, reports repro steps
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
 install.sh                    Copies agents + merges the playbook into ~/.copilot/
@@ -119,18 +120,23 @@ After code is written, or when you ask the lead to
      a routing handoff inside the current round, not an additional completed round.
 4. **Full fan-out when needed** — all five full reviewers run in parallel. The QA
    tester joins only when runtime evidence is warranted.
-5. **Severity synthesis** — findings are deduplicated and prioritized
+5. **Common evidence contract** — each full reviewer reports severity, location,
+   claim, evidence, impact, minimal fix, and confidence. Deep review adds the
+   governing authority; Integration adds both sides of the affected contract.
+   Unsupported concerns remain non-blocking questions and are preserved in a
+   separate open-questions section.
+6. **Severity synthesis** — findings are deduplicated and prioritized
    Critical → Major → Minor → Nit, with a **findings ledger** recording who raised
    each Critical/Major full-team finding and its disposition.
-6. **Loop** — re-review only affected areas, with a global maximum of two
+7. **Loop** — re-review only affected areas, with a global maximum of two
    completed review rounds. If a lightweight pass escalates, the full-team pass
    completes that same round; escalation does not reset the count. If round one
    reached the full team, round two is a targeted full-team re-review. The cap
    applies per diff revision.
-7. **Final report** — lightweight review includes any one-line minority note
+8. **Final report** — lightweight review includes any one-line minority note
    for an overruled Major. Full review also includes the findings ledger, full
-   **minority report**, and a **residual-risk / exclusions statement**. Posting
-   to the PR happens only if you ask.
+   **minority report**, attributed **open questions**, and a **residual-risk /
+   exclusions statement**. Posting to the PR happens only if you ask.
 
 For review-only requests, the lead never edits code. The author supplies a
 revised diff before another review cycle begins.
@@ -153,11 +159,19 @@ Use the full team immediately, or escalate from lightweight review, for:
 - **Critical** — must fix before merge (security holes, data loss, crashes, broken
   contracts).
 - **Major** — should fix before merge (real bugs, missing edge cases, spec gaps).
-- **Minor** — worth fixing (clarity, small correctness/robustness issues). A
-  deep-reviewer **Question** lands here, carrying an open question.
+- **Minor** — worth fixing (clarity, small correctness/robustness issues).
 - **Nit** — optional polish. Dropped unless you want thoroughness.
+- **Question** — non-blocking and kept in a separate attributed open-questions
+  section until evidence promotes it to a finding or resolves it.
 
 The qa-tester's P0/P1/P2/P3 map onto Critical/Major/Minor/Nit during synthesis.
+
+QA starts with the smallest relevant existing target and uses explicit timeouts.
+The lead may approve a longer existing local build or suite when narrower evidence
+cannot resolve the behavior. Network access, dependency installation, destructive
+operations, secrets access, and persistent mutation require explicit user approval.
+Its output is evidence for an exact scenario, never a general claim that the change
+is safe.
 
 ### The QA tester is an instrument, not a judge
 
@@ -245,8 +259,9 @@ $EDITOR agents/local-readability-reviewer.agent.md
 ```
 
 If a referenced model isn't available to your account, point that agent at one that
-is. When swapping, keep the adversarial reviewers across **different** families —
-that cross-family spread is where most of the review value comes from.
+is. When swapping, preserve independent family counterweights among the
+judgment-producing reviewers; no single family should dominate every review lens
+or its own semantic tie-break.
 
 ### Tracking agent changes
 

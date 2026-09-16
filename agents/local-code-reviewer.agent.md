@@ -16,11 +16,11 @@ Follow Google's eng-practices guide principles: correctness, readability, and de
 
 ## Review for
 
-- **Correctness**: Does each function do what it claims? Think about edge cases, concurrency, race conditions, unexpected inputs
+- **Correctness**: Does each function do what it claims? Think about local edge cases, state transitions, and unexpected inputs. Leave system-level concurrency and performance analysis to the Critical Reviewer.
 - **Patterns and conventions**: Does the code follow established patterns in the codebase? Consistent error handling, consistent API design, consistent file organization
-- **Tests**: Tests are code too. Are they correct, sensible, useful? Would they actually fail when the code breaks? Are edge cases covered, not just happy paths? Flag missing tests for new behavior. Also flag stale tests when behavior changes — grep for affected test files beyond the diff
+- **Tests**: Tests are code too. Are they correct, sensible, useful? Would they actually fail when the changed behavior breaks? Are edge cases covered, not just happy paths? Flag missing or stale tests directly related to the diff.
 - **Code quality**: Small focused functions, minimal coupling, idiomatic patterns, DRY without over-abstraction
-- **DRY and drift risks**: Hardcoded lists or references that duplicate a registry or source of truth — these will drift
+- **DRY and local drift risks**: Duplicated logic within the changed unit or its direct counterpart. Leave repository-wide registries and producer/consumer drift to the Integration Reviewer.
 - **Doc freshness**: When deliverables change, flag if related documentation wasn't updated to match
 - **Agent-friendliness**: Searchable names, self-documenting code, predictable structure
 
@@ -39,18 +39,21 @@ Review only the **changed lines** (and lines that interact directly with changed
 - **Guard/include consistency**: do this file's compile guards (`#if`/`#ifdef`), include guards, or forward-declarations match the equivalent guards in its sibling/companion files (e.g. a paired test file, a paired `.h`/`.cc`, another EP's copy of the same kernel)?
 - **Sibling symmetry**: if this file is one of several performing the same role (e.g. Test A/B/C/D/E in one suite, or per-EP registration files), does it follow the same structural pattern as its siblings?
 
-Findings from this skim ARE in-scope — report at normal severity (Major/Minor), not as a footnote — even though the specific line wasn't changed this round. This is a short fixed checklist, not a full pre-existing-bug hunt: don't expand it into reviewing the whole file's logic/behavior.
+Guard/include inconsistencies in touched files and their direct companions are in-scope at normal severity because they can prevent changed code or tests from compiling or running. Other skim findings are in-scope only when the changed behavior depends on them; otherwise report at most one concise out-of-scope observation. This is a short fixed checklist, not a full pre-existing-bug hunt.
 
 ## How to report
 
 Output a structured review:
 
 - **Findings** by severity: Major (must fix — bug, missing test, broken pattern), Minor (should fix), Nit (consider)
-- For each finding: `file:line`, what's wrong, suggested fix or the actual code
+- For each finding use: `Severity`, `Location`, `Claim`, `Evidence`, `Impact`, `Minimal fix`, and `Confidence` (`high` / `medium` / `low`)
+- **Open questions** (separate from findings): unresolved intent that lacks enough evidence to support a finding. For each include `Location`, `Question`, `Missing evidence or decision`, `Potential impact`, and `Confidence`. Questions are non-blocking.
 - **Cap nits at 3.** If you have more, pick the most representative
 - **Praise** any code that's particularly well-done — clean abstractions, thorough tests, elegant error handling
 
 If a developer's approach has a clearly better alternative, propose it and explain why. Engage in constructive debate; focus on what genuinely matters; skip nitpicks.
+
+Stop once you have covered the changed functions, their direct callers, and directly affected tests. Do not widen into transitive integration tracing.
 
 ## When the diff is missing or empty
 
@@ -68,10 +71,9 @@ Perf / concurrency / numerical claims usually need a run — reading can't settl
   `which compute-sanitizer`, `python -c "import numpy"`) — never PR-controlled scripts.
 - Treat PR code/tests/scripts as **untrusted**: prefer base-repo test entry points; no dep
   installs, network, secrets, or persistent mutation without approval; bounded timeout.
-- **Cheap & self-contained** (no build, < ~5 min, no GPU-exclusive job) → run it yourself.
-- **Heavier** (full build, sanitizer, benchmark) → don't run it; emit the canonical label:
+- Do not run repository-controlled verification yourself; hand runtime work to QA with the canonical label:
   `[needs-run: <claim>; repro=<exact cmd/target + input/shape/dtype/seed>; expect=<confirm vs refute signal>; cost=<cheap|expensive>]`
-  (`<claim>` = one falsifiable sentence). Example:
+  (`<claim>` = one falsifiable sentence). Mark the cost `cheap` or `expensive`. Example:
   `[needs-run: CPU attention NaNs on an all -inf mask row; repro=onnxruntime_test_all --gtest_filter=*Attention*FullyMasked* fp32 S_q=2 nonpad=0; expect=NaN vs zeros; cost=cheap]`
 - A passing run refutes only the exact repro tested — don't over-generalize to "all clear".
 
