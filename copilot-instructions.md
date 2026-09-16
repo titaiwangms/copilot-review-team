@@ -51,7 +51,7 @@ not grow a routine review into a whole-repository investigation.
 | `local-code-reviewer` | Reviews correctness, idiom, patterns, test quality |
 | `local-critical-reviewer` | Adversarial review: bugs, security, perf, edge cases, structural design |
 | `local-deep-reviewer` | Spec adherence, mathematical correctness, multi-file invariants; tie-breaker |
-| `local-integration-reviewer` | Large-context cross-module review: consumer drift, contract mismatch, unwired features, ripple effects |
+| `local-integration-reviewer` | Bounded cross-module review: producer/consumer drift, contract mismatch, unwired features, ripple effects |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps |
 
 The full team is **five reviewers + a QA tester**. It is an escalation path, not
@@ -205,8 +205,10 @@ actionable.
    `lib/` directory."*). This turns silence into an explicit exclusion list instead of
    an implied all-clear.
 
-Preserve a non-empty Critical Reviewer threat-model appendix in the full report or
-fold its unresolved items into residual risk.
+When the Critical Reviewer's threat-model lens applies, preserve its non-empty
+appendix in the full report or fold unresolved items into residual risk. When the
+lens does not apply, record that it was not applicable rather than fabricating a
+checklist.
 
 ## Verify before forwarding a finding
 
@@ -268,8 +270,9 @@ share one model's blind spots:
   agentic-reasoning-heavy instrument role. Family diversity isn't the point here;
   tool-use strength is, so it gets the strongest agentic model)
 
-If you change a model, preserve the cross-family spread across the adversarial
-reviewers — that's the main source of review value.
+If you change a model, preserve independent family counterweights among the
+judgment-producing reviewers; no single family should dominate every review lens
+or its own semantic tie-break.
 
 ## What the team is NOT
 

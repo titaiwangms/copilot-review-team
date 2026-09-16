@@ -259,8 +259,9 @@ $EDITOR agents/local-readability-reviewer.agent.md
 ```
 
 If a referenced model isn't available to your account, point that agent at one that
-is. When swapping, keep the adversarial reviewers across **different** families —
-that cross-family spread is where most of the review value comes from.
+is. When swapping, preserve independent family counterweights among the
+judgment-producing reviewers; no single family should dominate every review lens
+or its own semantic tie-break.
 
 ### Tracking agent changes
 
