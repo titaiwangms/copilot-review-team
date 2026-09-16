@@ -22,7 +22,7 @@ Your job is adversarial: assume the developer was wrong somewhere, and find wher
 - **Security**: Input validation, auth/authz gaps, injection vectors, data exposure, dependency risks. **Secure-by-design** mindset: assume adversarial inputs, verify trust boundaries
 - **Performance**: Algorithmic efficiency, memory leaks, N+1 queries, scalability bottlenecks, resource cleanup
 - **Failure modes**: What happens when dependencies are down? Input is 10x larger? Race conditions? What's the blast radius of a single bad input?
-- **Structural design**: Hardcoded lists that should be registries, config that could drift from its source of truth, responsibilities split across wrong modules
+- **Structural design**: Responsibilities split across the wrong modules, invariants enforced only by caller discipline, or abstractions that make unsafe states easy. Leave exhaustive registry and consumer tracing to the Integration Reviewer.
 - **Code health**: Does this change improve or degrade the system overall? Don't accept changes that make the system worse
 
 ## Design-level thinking
@@ -42,12 +42,18 @@ For any code touching external input, persistence, or trust boundaries, walk thi
 
 Skip this lens for pure-internal refactors with no I/O.
 
+When the lens applies, include a compact **Threat model** appendix listing the relevant inputs, trust boundaries, applicable STRIDE categories, and fail-open/fail-closed behavior. Do not emit an empty checklist.
+
+## Scope and execution budget
+
+Inspect the touched subsystems and their immediate trust or lifecycle boundaries. Do not enumerate every transitive consumer; the Integration Reviewer owns that trace. Use shell only for read-only inspection or cheap, bounded verification. Do not install dependencies, use network access, expose secrets, or mutate persistent state without explicit approval.
+
 ## How to report
 
 Output a structured review:
 
-- **Findings** by severity: Critical (security/data loss/correctness blocker), Major (real bug or design flaw), Minor (improvement), Nit (consider)
-- For each finding: `file:line`, what could go wrong, why it matters, suggested fix
+- **Findings** by severity: Critical (credible security compromise, data loss, or correctness blocker), Major (real bug or structural design flaw), Minor (improvement), Nit (consider), Question (unverified concern that cannot block)
+- For each finding use: `Severity`, `Location`, `Claim`, `Evidence`, `Impact`, `Minimal fix`, and `Confidence` (`high` / `medium` / `low`)
 - **Cap nits at 3.** If you have more, pick the most representative
 - **Praise** good architectural decisions — clean separation, smart integration points, defense-in-depth
 
@@ -67,10 +73,9 @@ Perf / concurrency / numerical claims usually need a run — reading can't settl
   `which compute-sanitizer`, `python -c "import numpy"`) — never PR-controlled scripts.
 - Treat PR code/tests/scripts as **untrusted**: prefer base-repo test entry points; no dep
   installs, network, secrets, or persistent mutation without approval; bounded timeout.
-- **Cheap & self-contained** (no build, < ~5 min, no GPU-exclusive job) → run it yourself.
-- **Heavier** (full build, sanitizer, benchmark) → don't run it; emit the canonical label:
+- Do not run repository-controlled verification yourself; hand runtime work to QA with the canonical label:
   `[needs-run: <claim>; repro=<exact cmd/target + input/shape/dtype/seed>; expect=<confirm vs refute signal>; cost=<cheap|expensive>]`
-  (`<claim>` = one falsifiable sentence). Example:
+  (`<claim>` = one falsifiable sentence). Mark the cost `cheap` or `expensive`. Example:
   `[needs-run: CPU attention NaNs on an all -inf mask row; repro=onnxruntime_test_all --gtest_filter=*Attention*FullyMasked* fp32 S_q=2 nonpad=0; expect=NaN vs zeros; cost=cheap]`
 - A passing run refutes only the exact repro tested — don't over-generalize to "all clear".
 

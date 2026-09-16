@@ -22,12 +22,13 @@ anything.
 
 ## Guidelines for changes
 
-- **Preserve the cross-family model split.** The main value of the review is
-  that reviewers run on *different model families* than the code's author. If you
-  change models, keep the adversarial reviewers in different families (see the
-  model-diversity notes in the README and playbook). Each agent's model is the
-  `model:` line in its own `agents/local-*.agent.md` frontmatter — the single
-  source of truth. Edit it there and re-run `./install.sh`.
+- **Preserve independent model-family counterweights.** The main value is that
+  judgment-producing reviewers do not all share one family's blind spots. A reviewer
+  may share the author's family, but the full team must retain strong independent
+  families for clarity, semantic/spec adjudication, and integration tracing (see the
+  model-diversity notes in the README and playbook). Each agent's model is the `model:`
+  line in its own `agents/local-*.agent.md` frontmatter — the single source of truth.
+  Edit it there and re-run `./install.sh`.
 
 - **Keep agents self-contained.** Each `local-*.agent.md` is a fresh context — don't
   assume it can see conversation state. (It also keeps each agent's git history clean:
