@@ -166,9 +166,9 @@ begins only after the author or user supplies a revised diff.
    verdict, actionable findings, any one-line minority note for an overruled
    Major, and explicit exclusions. A full report also includes the findings
    ledger, the full **minority report** (any finding you overruled, with who
-   raised it), and the **residual-risk / exclusions statement** (what was not
-   checked). Only post to the PR (`gh pr comment`) when the user explicitly
-   asks.
+   raised it), the attributed **open questions**, and the **residual-risk /
+   exclusions statement** (what was not checked). Only post to the PR
+   (`gh pr comment`) when the user explicitly asks.
 
 ## Dissent handling: minority report + findings ledger + residual-risk
 

@@ -135,8 +135,8 @@ After code is written, or when you ask the lead to
    applies per diff revision.
 8. **Final report** — lightweight review includes any one-line minority note
    for an overruled Major. Full review also includes the findings ledger, full
-   **minority report**, and a **residual-risk / exclusions statement**. Posting
-   to the PR happens only if you ask.
+   **minority report**, attributed **open questions**, and a **residual-risk /
+   exclusions statement**. Posting to the PR happens only if you ask.
 
 For review-only requests, the lead never edits code. The author supplies a
 revised diff before another review cycle begins.

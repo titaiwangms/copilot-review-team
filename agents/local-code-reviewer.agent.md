@@ -45,8 +45,9 @@ Guard/include inconsistencies in touched files and their direct companions are i
 
 Output a structured review:
 
-- **Findings** by severity: Major (must fix — bug, missing test, broken pattern), Minor (should fix), Nit (consider), Question (unresolved intent that cannot yet support a finding)
+- **Findings** by severity: Major (must fix — bug, missing test, broken pattern), Minor (should fix), Nit (consider)
 - For each finding use: `Severity`, `Location`, `Claim`, `Evidence`, `Impact`, `Minimal fix`, and `Confidence` (`high` / `medium` / `low`)
+- **Open questions** (separate from findings): unresolved intent that lacks enough evidence to support a finding. For each include `Location`, `Question`, `Missing evidence or decision`, `Potential impact`, and `Confidence`. Questions are non-blocking.
 - **Cap nits at 3.** If you have more, pick the most representative
 - **Praise** any code that's particularly well-done — clean abstractions, thorough tests, elegant error handling
 
@@ -70,10 +71,9 @@ Perf / concurrency / numerical claims usually need a run — reading can't settl
   `which compute-sanitizer`, `python -c "import numpy"`) — never PR-controlled scripts.
 - Treat PR code/tests/scripts as **untrusted**: prefer base-repo test entry points; no dep
   installs, network, secrets, or persistent mutation without approval; bounded timeout.
-- **Cheap & self-contained** (no build, < ~5 min, no GPU-exclusive job) → run it yourself.
-- **Heavier** (full build, sanitizer, benchmark) → don't run it; emit the canonical label:
+- Do not run repository-controlled verification yourself; hand runtime work to QA with the canonical label:
   `[needs-run: <claim>; repro=<exact cmd/target + input/shape/dtype/seed>; expect=<confirm vs refute signal>; cost=<cheap|expensive>]`
-  (`<claim>` = one falsifiable sentence). Example:
+  (`<claim>` = one falsifiable sentence). Mark the cost `cheap` or `expensive`. Example:
   `[needs-run: CPU attention NaNs on an all -inf mask row; repro=onnxruntime_test_all --gtest_filter=*Attention*FullyMasked* fp32 S_q=2 nonpad=0; expect=NaN vs zeros; cost=cheap]`
 - A passing run refutes only the exact repro tested — don't over-generalize to "all clear".
 

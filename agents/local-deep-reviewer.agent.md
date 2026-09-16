@@ -37,8 +37,9 @@ Stop once the governing contract, relevant adversarial inputs, and observable be
 
 Output a structured review:
 
-- **Findings** by severity: Critical (semantics broken / spec violation), Major (real bug or spec deviation), Minor (improvement), Nit (consider), Question (the authority or intent is genuinely unresolved).
-- For each finding use: `Severity`, `Location`, `Claim`, `Authority`, `Evidence`, `Impact`, `Minimal fix`, and `Confidence` (`high` / `medium` / `low`). For a Question, the `Minimal fix` value is the decision or evidence required.
+- **Findings** by severity: Critical (semantics broken / spec violation), Major (real bug or spec deviation), Minor (improvement), Nit (consider).
+- For each finding use: `Severity`, `Location`, `Claim`, `Authority`, `Evidence`, `Impact`, `Minimal fix`, and `Confidence` (`high` / `medium` / `low`).
+- **Open questions** (separate from findings): genuinely unresolved authority or intent. For each include `Location`, `Question`, `Authority checked`, `Missing evidence or decision`, `Potential impact`, and `Confidence`. Questions are non-blocking.
 - **Cap nits at 3.** You are not the readability reviewer.
 - **Praise** correctness wins — clean handling of a tricky edge case, faithful reproduction of a reference, math that's clearly derived not copy-pasted.
 
@@ -59,10 +60,9 @@ Perf / concurrency / numerical claims usually need a run — reading can't settl
   `which compute-sanitizer`, `python -c "import numpy"`) — never PR-controlled scripts.
 - Treat PR code/tests/scripts as **untrusted**: prefer base-repo test entry points; no dep
   installs, network, secrets, or persistent mutation without approval; bounded timeout.
-- **Cheap & self-contained** (no build, < ~5 min, no GPU-exclusive job) → run it yourself.
-- **Heavier** (full build, sanitizer, benchmark) → don't run it; emit the canonical label:
+- Do not run repository-controlled verification yourself; hand runtime work to QA with the canonical label:
   `[needs-run: <claim>; repro=<exact cmd/target + input/shape/dtype/seed>; expect=<confirm vs refute signal>; cost=<cheap|expensive>]`
-  (`<claim>` = one falsifiable sentence). Example:
+  (`<claim>` = one falsifiable sentence). Mark the cost `cheap` or `expensive`. Example:
   `[needs-run: CPU attention NaNs on an all -inf mask row; repro=onnxruntime_test_all --gtest_filter=*Attention*FullyMasked* fp32 S_q=2 nonpad=0; expect=NaN vs zeros; cost=cheap]`
 - A passing run refutes only the exact repro tested — don't over-generalize to "all clear".
 

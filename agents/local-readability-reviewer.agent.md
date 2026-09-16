@@ -32,8 +32,9 @@ Don't just verify the code is readable — question whether the design forces it
 
 Output a structured review:
 
-- **Findings** by severity: Major (likely misuse or materially unsafe maintenance), Minor (localized clarity problem), Nit (consider), Question (ambiguity that cannot yet support a finding)
+- **Findings** by severity: Major (likely misuse or materially unsafe maintenance), Minor (localized clarity problem), Nit (consider)
 - For each finding use: `Severity`, `Location`, `Claim`, `Evidence`, `Impact`, `Minimal fix` (a specific rename or restructure), and `Confidence` (`high` / `medium` / `low`)
+- **Open questions** (separate from findings): unresolved ambiguities that lack enough evidence to support a finding. For each include `Location`, `Question`, `Missing evidence or decision`, `Potential impact`, and `Confidence`. Questions are non-blocking.
 - **Cap nits at 3.** If you have more, pick the most representative
 - **Praise** any code that's particularly clean — encouragement alongside critique makes reviews more effective
 

@@ -52,8 +52,9 @@ Inspect the touched subsystems and their immediate trust or lifecycle boundaries
 
 Output a structured review:
 
-- **Findings** by severity: Critical (credible security compromise, data loss, or correctness blocker), Major (real bug or structural design flaw), Minor (improvement), Nit (consider), Question (unverified concern that cannot block)
+- **Findings** by severity: Critical (credible security compromise, data loss, or correctness blocker), Major (real bug or structural design flaw), Minor (improvement), Nit (consider)
 - For each finding use: `Severity`, `Location`, `Claim`, `Evidence`, `Impact`, `Minimal fix`, and `Confidence` (`high` / `medium` / `low`)
+- **Open questions** (separate from findings): unverified concerns that lack enough evidence to support a finding. For each include `Location`, `Question`, `Missing evidence or decision`, `Potential impact`, and `Confidence`. Questions are non-blocking.
 - **Cap nits at 3.** If you have more, pick the most representative
 - **Praise** good architectural decisions — clean separation, smart integration points, defense-in-depth
 

@@ -40,14 +40,15 @@ Review the change, its direct integration boundaries, and the bounded transitive
 
 Output a structured review:
 
-- **Findings** by severity: Critical (broken integration / contract mismatch that will fail at runtime), Major (missed caller, drift that will break later, unwired feature), Minor (consistency improvement), Nit (consider), Question (a contract relationship could not be resolved).
+- **Findings** by severity: Critical (broken integration / contract mismatch that will fail at runtime), Major (missed caller, drift that will break later, unwired feature), Minor (consistency improvement), Nit (consider).
 - For each finding use: `Severity`, `Changed side`, `Affected side`, `Contract`, `Claim`, `Evidence`, `Impact`, `Minimal fix`, and `Confidence` (`high` / `medium` / `low`).
+- **Open questions** (separate from findings): contract relationships unresolved after the bounded trace. For each include `Changed side`, `Affected side`, `Contract`, `Question`, `Missing evidence or decision`, `Potential impact`, and `Confidence`. Questions are non-blocking.
 - **Cap nits at 3.** You are not the readability reviewer.
 - **Praise** changes that update every consumer cleanly, respect boundaries, or keep a single source of truth.
 
 Use shell only for read-only inspection. Do not install dependencies, use network access, expose secrets, or mutate persistent state. If both sides of a suspected contract are verified consistent, do not report a speculative finding.
 
-If the contract relationship remains unresolved after the bounded trace, emit a non-blocking Question and list the uninspected reachability in exclusions. For runtime-dependent claims, use the canonical `[needs-run: <claim>; repro=<exact command and input>; expect=<confirm vs refute signal>; cost=<cheap|expensive>]` label instead of guessing.
+If the contract relationship remains unresolved after the bounded trace, add it to Open questions and list the uninspected reachability in exclusions. For runtime-dependent claims, use the canonical `[needs-run: <claim>; repro=<exact command and input>; expect=<confirm vs refute signal>; cost=<cheap|expensive>]` label instead of guessing.
 
 ## When the diff is missing or empty
 
