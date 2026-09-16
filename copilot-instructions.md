@@ -247,10 +247,10 @@ share one model's blind spots:
 - Integration Reviewer is **Grok 4.6** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window makes it the natural fit
   for wide cross-module/whole-codebase consistency review)
-- QA Tester is **GPT-5.6 Sol** (it runs the code, authors repros, brings up cold/
-  misconfigured builds, and drives sanitizers/benchmarks — an agentic-reasoning-heavy
-  instrument role. Family diversity isn't the point here; tool-use strength is, so it gets
-  a strong agentic model rather than a cheaper log-reader)
+- QA Tester is **GPT-6 Astra** (it runs the code, authors repros, brings up cold/
+  misconfigured builds, and drives sanitizers/benchmarks — a long-horizon,
+  agentic-reasoning-heavy instrument role. Family diversity isn't the point here;
+  tool-use strength is, so it gets the strongest agentic model)
 
 If you change a model, preserve the cross-family spread across the adversarial
 reviewers — that's the main source of review value.
