@@ -72,7 +72,7 @@ are read from those files.
 | `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-5.6-sol` | Second cross-family adversary — different blind spots from the author (now the GPT-5.6 flagship, Sol tier) |
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
 | `local-integration-reviewer` | Cross-module wiring, contract drift, ripple effects, whole-codebase consistency | `grok-4.6` | Third model family + large context window for wide cross-module review |
-| `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-5.6-sol` | Authoring repros, cold-env build bring-up, and driving sanitizers/benchmarks is agentic-reasoning-heavy — not mere log reading — so it gets a strong agentic tool-use model |
+| `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6-astra` | Long-horizon repro work, cold-env build bring-up, and driving sanitizers/benchmarks benefit from Astra's strong agentic tool use |
 
 The `local-` prefix is a namespace convention marking these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you
