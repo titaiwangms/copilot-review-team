@@ -255,11 +255,12 @@ review is fast and supplies two distinct model-family perspectives. The full
 team is intentionally split across model families so deep escalation does not
 share one model's blind spots:
 
-- Code Reviewer + Critical Reviewer are **GPT** (a separate adversarial lens when
-  the code author uses another model family)
+- Code Reviewer + Critical Reviewer are **GPT** specialists; the Critical Reviewer
+  uses a different model from the default GPT-6 Sol developer, while Claude and
+  Grok reviewers provide cross-family counterweights
 - Readability Reviewer is **Claude sonnet** (clarity is a fresh-reader lens, not
   adversarial)
-- Deep Reviewer is **Claude Opus 5** (strong base model for spec adherence, math, and
+- Deep Reviewer is **Claude Opus 5.5** (strong base model for spec adherence, math, and
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
   math/spec claim)
 - Integration Reviewer is **Grok 4.6** (third model family — a fresh blind-spot
