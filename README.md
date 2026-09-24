@@ -71,7 +71,7 @@ are read from those files.
 | `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-5` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
 | `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-5.3-codex` | Code-tuned local implementation and test-quality lens |
 | `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-6-sol` | Strong architecture, security, and failure-mode adversary |
-| `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
+| `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5.5` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
 | `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `grok-4.6` | Third model family + large context window for producer/consumer analysis |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6-astra` | Long-horizon repro work, cold-env build bring-up, and driving sanitizers/benchmarks benefit from Astra's strong agentic tool use |
 
@@ -253,7 +253,7 @@ The model for each agent lives in one place: the `model:` line in that agent's
 
 ```bash
 # edit the model: line in the agent(s) you want to retarget, e.g.
-#   model: claude-sonnet-5   ->   model: claude-opus-5
+#   model: claude-sonnet-5   ->   model: claude-opus-5.5
 $EDITOR agents/local-readability-reviewer.agent.md
 ./install.sh        # re-run to push the change into ~/.copilot/
 ```

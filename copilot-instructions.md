@@ -259,7 +259,7 @@ share one model's blind spots:
   the code author uses another model family)
 - Readability Reviewer is **Claude sonnet** (clarity is a fresh-reader lens, not
   adversarial)
-- Deep Reviewer is **Claude Opus 5** (strong base model for spec adherence, math, and
+- Deep Reviewer is **Claude Opus 5.5** (strong base model for spec adherence, math, and
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
   math/spec claim)
 - Integration Reviewer is **Grok 4.6** (third model family — a fresh blind-spot
