@@ -1,7 +1,7 @@
 ---
 name: local-critical-reviewer
 description: "Adversarial review for bugs, security, performance, edge cases, and structural design flaws."
-model: gpt-6-sol
+model: gpt-6-astra
 tools:
   - read
   - search
