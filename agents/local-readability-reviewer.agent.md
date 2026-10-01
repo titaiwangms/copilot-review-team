@@ -1,7 +1,7 @@
 ---
 name: local-readability-reviewer
 description: "Reviews naming, organization, simplicity, and documentation. Asks: could a new developer understand this fast?"
-model: claude-sonnet-5
+model: claude-sonnet-5.5
 tools:
   - read
   - search

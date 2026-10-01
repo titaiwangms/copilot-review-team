@@ -250,20 +250,20 @@ arbitrary (sometimes hostile) code, which is exactly where prompt injection happ
 
 ## Model diversity rationale (don't change without thinking)
 
-The lightweight pair uses **MAI-Code-1.1-Flash + Claude Sonnet 5** so routine
+The lightweight pair uses **MAI-Code-1.1-Flash + Claude Sonnet 5.5** so routine
 review is fast and supplies two distinct model-family perspectives. The full
 team is intentionally split across model families so deep escalation does not
 share one model's blind spots:
 
 - Code Reviewer + Critical Reviewer are **GPT** specialists; the Critical Reviewer
-  uses a different model from the default GPT-6 Sol developer, while Claude and
+  uses a different model from the default GPT-6.1 Sol developer, while Claude and
   Grok reviewers provide cross-family counterweights
 - Readability Reviewer is **Claude sonnet** (clarity is a fresh-reader lens, not
   adversarial)
 - Deep Reviewer is **Claude Opus 5.5** (strong base model for spec adherence, math, and
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
   math/spec claim)
-- Integration Reviewer is **Grok 4.6** (third model family — a fresh blind-spot
+- Integration Reviewer is **Grok 4.7** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window fits bounded
   cross-module producer/consumer tracing)
 - QA Tester is **GPT-6 Astra** (it runs the code, authors repros, brings up cold/
