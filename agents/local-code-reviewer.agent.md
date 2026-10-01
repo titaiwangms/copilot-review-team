@@ -1,7 +1,7 @@
 ---
 name: local-code-reviewer
 description: "Reviews implementation correctness, patterns, idiom, and test quality at the function level."
-model: gpt-5.3-codex
+model: gpt-6.1-sol
 tools:
   - read
   - search

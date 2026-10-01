@@ -1,7 +1,7 @@
 ---
 name: local-integration-reviewer
 description: "Bounded integration review: cross-module consistency, producer/consumer contracts, and ripple effects."
-model: grok-4.6
+model: grok-4.7
 tools:
   - read
   - search

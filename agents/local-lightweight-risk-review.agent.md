@@ -1,7 +1,7 @@
 ---
 name: local-lightweight-risk-review
 description: "Fast semantic and adversarial review for real-time coding feedback: intent, failure modes, and local contracts."
-model: claude-sonnet-5
+model: claude-sonnet-5.5
 tools:
   - read
   - search
