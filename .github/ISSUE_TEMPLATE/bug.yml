@@ -42,5 +42,6 @@ body:
       label: Models involved (if relevant)
       description: |
         Include the agent name, model ID, exact error, and whether it appears in
-        your current model catalog. For Astra failures, note whether the matching
-        -sol backup was used and what happened; do not include tokens or credentials.
+        your current model catalog. For Astra or Opus failures, note whether the
+        matching -sol or -sonnet backup was used and what happened; do not include
+        tokens or credentials.

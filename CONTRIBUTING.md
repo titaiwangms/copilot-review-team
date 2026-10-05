@@ -35,14 +35,18 @@ anything.
   `git log --follow -p agents/local-*.agent.md` is the per-agent evolution log — no
   separate changelog needed.)
 
-- **Keep Astra/Sol pairs in sync.** `local-critical-reviewer-sol` and
-  `local-qa-tester-sol` replace their Astra primaries when that model is
-  unavailable; they are not additional review or QA roles. Maintain identical
+- **Keep primary/backup pairs in sync.** `local-critical-reviewer-sol` and
+  `local-qa-tester-sol` replace their Astra primaries; `local-deep-reviewer-sonnet`
+  replaces its Opus 5.5 primary when that model is unavailable. They are not
+  additional review or QA roles. Maintain identical
   role bodies and tool grants in each pair. Only frontmatter names, model IDs,
   and variant descriptions should differ. Update both README and playbook
   roster rows when adding or renaming a variant. The Sol Critical Reviewer can
   share the developer's model, so do not remove the independent Claude/Grok
-  counterweights to compensate. Do not reinterpret unrelated failures as
+  counterweights to compensate. The Sonnet Deep Reviewer preserves its
+  authority/evidence requirements but may share the Readability Reviewer's model;
+  do not claim Opus-equivalent capability or treat unresolved proofs as approvals.
+  Do not reinterpret unrelated failures as
   model unavailability.
 
 - **Bump the `VERSION` file when shipping changes.** It holds a single semver line
@@ -65,7 +69,7 @@ anything.
   you have it installed). The same script runs in CI on every push and PR. Expect
   one `PASS`/`FAIL`/`SKIP` line per check and a
   final summary; the exit code is nonzero if any check fails.
-  The Sol backups are included in frontmatter, roster, and tool-policy checks.
+  The Sol and Sonnet backups are included in frontmatter, roster, and tool-policy checks.
   When editing a paired prompt, also compare its body and tools with its primary;
   the self-checks do not currently enforce prompt-body parity.
 

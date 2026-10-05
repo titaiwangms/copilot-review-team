@@ -57,25 +57,36 @@ not grow a routine review into a whole-repository investigation.
 The full team is **five reviewers + a QA tester**. It is an escalation path, not
 the default tax on every completed change.
 
-### Astra backups
+### Model backups
 
 | Agent | Replaces | Role |
 |---|---|---|
 | `local-critical-reviewer-sol` | `local-critical-reviewer` | GPT-6.1 Sol backup for the Critical Reviewer |
 | `local-qa-tester-sol` | `local-qa-tester` | GPT-6.1 Sol backup for the QA Tester |
+| `local-deep-reviewer-sonnet` | `local-deep-reviewer` | Claude Sonnet 5.5 backup for the Deep Reviewer |
 
-Keep the Astra agents as the primary versions. If Astra is unavailable in the
+This repository ships backups only for the roles in this table. If a role has
+no installed backup, report it as blocked; do not invent an agent name or omit it.
+
+Keep the Astra and Opus agents as the primary versions. If a primary model is unavailable in the
 current model catalog or an invocation fails specifically because the model is
-unavailable, use the corresponding `-sol` agent instead. These are replacements
+unavailable, use its corresponding backup instead: `-sol` for Astra,
+`-sonnet` for Opus 5.5. These are replacements
 for the same role, not additional team members; do not run both variants for one
 role in the same phase. Other failures still follow the sub-agent failure policy.
 State when a backup is used and pass it the same task, diff, constraints, and
 evidence. A model-unavailable attempt is not a completed review round and does
-not reset the two-round cap. If Sol is also unavailable, report the blocked role;
+not reset the two-round cap. If the backup model is also unavailable, report the blocked role;
 do not silently omit it or pick another model. The Sol Critical Reviewer may
 share the developer's model and the Code Reviewer's model, so retain the
 independent Claude and Grok review lenses. Both QA variants follow the same
 execution limits and exact-scenario evidence contract.
+
+The Sonnet Deep Reviewer preserves the Claude family and the same authority,
+boundary-input, and evidence requirements, not a claim of Opus-equivalent
+capability. It may share the Readability Reviewer's model. Unresolved proofs or
+spec disputes remain attributed, non-blocking open questions; never turn an
+unresolved dispute into an unsupported approval just because the review ran.
 
 ## Match review depth to task size
 
@@ -135,9 +146,10 @@ begins only after the author or user supplies a revised diff.
    - `local-deep-reviewer`
    - `local-integration-reviewer`
 
-   Apply [Astra backups](#astra-backups) before launching: substitute
-   `local-critical-reviewer-sol` when Astra is unavailable, without adding a
-   sixth review role.
+   Apply [Model backups](#model-backups) before launching: substitute
+   `local-critical-reviewer-sol` when Astra is unavailable and
+   `local-deep-reviewer-sonnet` when Opus 5.5 is unavailable, without adding
+   review roles.
 
    **Pass the diff inline in each prompt** (`git diff` output, or a summary of changed
    files with line numbers). Don't make each reviewer fetch it independently — that
@@ -247,9 +259,9 @@ rather than forwarding it.
 
 If a sub-agent fails (errors out, returns garbage, refuses, or times out):
 
-For an Astra model-unavailable failure, apply [Astra backups](#astra-backups)
+For an Astra or Opus model-unavailable failure, apply [Model backups](#model-backups)
 instead of retrying the same unavailable model. Do not treat a timeout,
-malformed report, or repository test failure as proof that Astra is unavailable.
+malformed report, or repository test failure as proof of model unavailability.
 For other failures:
 
 1. **Retry once** with a clarified prompt.
@@ -293,7 +305,9 @@ share one model's blind spots:
   adversarial)
 - Deep Reviewer is **Claude Opus 5.5** (strong base model for spec adherence, math, and
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
-  math/spec claim)
+  math/spec claim). Its `local-deep-reviewer-sonnet` backup uses Claude Sonnet 5.5
+  when Opus is unavailable, preserving the role but sharing the Readability
+  Reviewer's model and not guaranteeing equivalent capability.
 - Integration Reviewer is **Grok 4.7** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window fits bounded
   cross-module producer/consumer tracing)

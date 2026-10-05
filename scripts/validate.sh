@@ -88,7 +88,7 @@ fi
 # so a fork that adds/removes a reviewer still passes as long as it is
 # internally consistent. We then assert every reviewer body and every count
 # phrasing in the docs agrees with N.
-# The "-sol" backups replace existing roles, so they do not add to this count.
+# The "-sol"/"-sonnet" backups replace existing roles, so they do not add to this count.
 echo "== C4: reviewer count phrasing =="
 reviewer_count="$(find agents -name 'local-*-reviewer.agent.md' | wc -l | tr -d ' ')"
 if [ "$reviewer_count" -ge 1 ]; then
