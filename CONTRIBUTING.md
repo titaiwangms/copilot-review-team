@@ -70,6 +70,8 @@ anything.
   one `PASS`/`FAIL`/`SKIP` line per check and a
   final summary; the exit code is nonzero if any check fails.
   The Sol and Sonnet backups are included in frontmatter, roster, and tool-policy checks.
+  Reviewer-count checks validate both primary and backup reviewer prompts against
+  the primary role count, with regression coverage for forks that change the team.
   When editing a paired prompt, also compare its body and tools with its primary;
   the self-checks do not currently enforce prompt-body parity.
 
