@@ -57,6 +57,37 @@ not grow a routine review into a whole-repository investigation.
 The full team is **five reviewers + a QA tester**. It is an escalation path, not
 the default tax on every completed change.
 
+### Model backups
+
+| Agent | Replaces | Role |
+|---|---|---|
+| `local-critical-reviewer-sol` | `local-critical-reviewer` | GPT-6.1 Sol backup for the Critical Reviewer |
+| `local-qa-tester-sol` | `local-qa-tester` | GPT-6.1 Sol backup for the QA Tester |
+| `local-deep-reviewer-sonnet` | `local-deep-reviewer` | Claude Sonnet 5.5 backup for the Deep Reviewer |
+
+This repository ships backups only for the roles in this table. If a role has
+no installed backup, report it as blocked; do not invent an agent name or omit it.
+
+Keep the Astra and Opus agents as the primary versions. If a primary model is unavailable in the
+current model catalog or an invocation fails specifically because the model is
+unavailable, use its corresponding backup instead: `-sol` for Astra,
+`-sonnet` for Opus 5.5. These are replacements
+for the same role, not additional team members; do not run both variants for one
+role in the same phase. Other failures still follow the sub-agent failure policy.
+State when a backup is used and pass it the same task, diff, constraints, and
+evidence. A model-unavailable attempt is not a completed review round and does
+not reset the two-round cap. If the backup model is also unavailable, report the blocked role;
+do not silently omit it or pick another model. The Sol Critical Reviewer may
+share the developer's model and the Code Reviewer's model, so retain the
+independent Claude and Grok review lenses. Both QA variants follow the same
+execution limits and exact-scenario evidence contract.
+
+The Sonnet Deep Reviewer preserves the Claude family and the same authority,
+boundary-input, and evidence requirements, not a claim of Opus-equivalent
+capability. It may share the Readability Reviewer's model. Unresolved proofs or
+spec disputes remain attributed, non-blocking open questions; never turn an
+unresolved dispute into an unsupported approval just because the review ran.
+
 ## Match review depth to task size
 
 Don't run the full team for every review — match the fan-out to the change:
@@ -115,6 +146,11 @@ begins only after the author or user supplies a revised diff.
    - `local-deep-reviewer`
    - `local-integration-reviewer`
 
+   Apply [Model backups](#model-backups) before launching: substitute
+   `local-critical-reviewer-sol` when Astra is unavailable and
+   `local-deep-reviewer-sonnet` when Opus 5.5 is unavailable, without adding
+   review roles.
+
    **Pass the diff inline in each prompt** (`git diff` output, or a summary of changed
    files with line numbers). Don't make each reviewer fetch it independently — that
    wastes tool calls and context. Each reviewer also gets the complete
@@ -130,7 +166,8 @@ begins only after the author or user supplies a revised diff.
    ledger or silently drop them.
 6. **Add `local-qa-tester` only when running the code is warranted** — when behavior,
    not just static structure, is in question and the change is runnable in this
-   workspace. **Review-only ≠ run the code:** unless the user asks you to execute the
+   workspace. Use `local-qa-tester-sol` instead when Astra is unavailable; this
+   does not change whether QA is warranted. **Review-only ≠ run the code:** unless the user asks you to execute the
    code (or behavior is genuinely in doubt), keep the pass static and leave the
    qa-tester out. Start with the smallest relevant existing target, require explicit
    timeouts, and treat a pass as evidence only for the exact scenario. The lead may
@@ -222,6 +259,11 @@ rather than forwarding it.
 
 If a sub-agent fails (errors out, returns garbage, refuses, or times out):
 
+For an Astra or Opus model-unavailable failure, apply [Model backups](#model-backups)
+instead of retrying the same unavailable model. Do not treat a timeout,
+malformed report, or repository test failure as proof of model unavailability.
+For other failures:
+
 1. **Retry once** with a clarified prompt.
 2. If it fails again, **surface to the user**: explain what failed, show the response,
    and either ask how to proceed or fall back to doing that role's review yourself
@@ -256,20 +298,24 @@ team is intentionally split across model families so deep escalation does not
 share one model's blind spots:
 
 - Code Reviewer + Critical Reviewer are **GPT** specialists; the Critical Reviewer
-  uses a different model from the default GPT-6.1 Sol developer, while Claude and
-  Grok reviewers provide cross-family counterweights
+  normally uses a different model from the default GPT-6.1 Sol developer (the Sol
+  backup does not), while Claude and Grok reviewers provide cross-family
+  counterweights
 - Readability Reviewer is **Claude sonnet** (clarity is a fresh-reader lens, not
   adversarial)
 - Deep Reviewer is **Claude Opus 5.5** (strong base model for spec adherence, math, and
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
-  math/spec claim)
+  math/spec claim). Its `local-deep-reviewer-sonnet` backup uses Claude Sonnet 5.5
+  when Opus is unavailable, preserving the role but sharing the Readability
+  Reviewer's model and not guaranteeing equivalent capability.
 - Integration Reviewer is **Grok 4.7** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window fits bounded
   cross-module producer/consumer tracing)
 - QA Tester is **GPT-6 Astra** (it runs the code, authors repros, brings up cold/
   misconfigured builds, and drives sanitizers/benchmarks — a long-horizon,
   agentic-reasoning-heavy instrument role. Family diversity isn't the point here;
-  tool-use strength is, so it gets the strongest agentic model)
+  tool-use strength is, so it gets the strongest agentic model). Its
+  `local-qa-tester-sol` backup uses GPT-6.1 Sol when Astra is unavailable.
 
 If you change a model, preserve independent family counterweights among the
 judgment-producing reviewers; no single family should dominate every review lens

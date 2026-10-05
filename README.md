@@ -74,6 +74,49 @@ are read from those files.
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5.5` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
 | `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `grok-4.7` | Third model family + large context window for producer/consumer analysis |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6-astra` | Long-horizon repro work, cold-env build bring-up, and driving sanitizers/benchmarks benefit from Astra's strong agentic tool use |
+| `local-critical-reviewer-sol` | Backup Critical Reviewer; same role and guardrails | `gpt-6.1-sol` | Use when Astra is unavailable; retains the role but may share the developer's model |
+| `local-qa-tester-sol` | Backup QA Tester; same execution and evidence contract | `gpt-6.1-sol` | Use when Astra is unavailable |
+| `local-deep-reviewer-sonnet` | Backup Deep Reviewer; same authority and evidence contract | `claude-sonnet-5.5` | Use when Opus 5.5 is unavailable; retains the Claude lens without claiming equal model capability |
+
+The `-sol` and `-sonnet` agents are self-contained backups, not extra team members.
+The full team still has five review roles and one optional QA role; eleven installed
+agent definitions do not mean eleven parallel calls. See [Model backups](#model-backups)
+for selection, failure handling, and the model-diversity trade-off.
+
+### Model backups
+
+Keep the Astra and Opus versions as primary. If a primary model is absent from the current model
+catalog, or an invocation fails specifically because that model is unavailable,
+the lead substitutes the matching backup: GPT-6.1 Sol for Astra, Claude Sonnet 5.5
+for Opus 5.5.
+
+| Primary | Backup | Backup model |
+|---|---|---|
+| `local-critical-reviewer` | `local-critical-reviewer-sol` | `gpt-6.1-sol` |
+| `local-qa-tester` | `local-qa-tester-sol` | `gpt-6.1-sol` |
+| `local-deep-reviewer` | `local-deep-reviewer-sonnet` | `claude-sonnet-5.5` |
+
+Only the backups in this table are shipped by this reviewer-only repository.
+If a role has no installed backup, report it as blocked rather than inventing
+an agent name or omitting it.
+
+This is **playbook-directed routing, not an automatic CLI model fallback**. The
+lead states which backup it uses and passes the same task, diff, constraints,
+and evidence to it. Run only one variant per role in each phase; an unavailable
+model attempt is not a completed review round. Unrelated failures follow the
+normal retry policy, not this substitution rule. If the backup model is also unavailable,
+report the blocked role rather than silently skipping it or choosing another
+model.
+
+The Sol Critical Reviewer may share the developer's model and the Code
+Reviewer's model. It preserves the adversarial role, not Astra's model-level
+independence; retain the Claude and Grok review lenses. The Sol QA Tester keeps
+the same execution limits and exact-scenario evidence contract.
+
+The Sonnet Deep Reviewer preserves the Claude family and the authority-grounded
+role, not a guarantee of Opus-equivalent capability. It may share the Readability
+Reviewer's model. Unresolved proofs or spec disputes remain attributed,
+non-blocking open questions rather than unsupported approvals.
 
 The `local-` prefix is a namespace convention marking these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you
@@ -82,15 +125,18 @@ add must follow that naming to be picked up.
 ## What's in here
 
 ```
-agents/                       8 sub-agent definitions
+agents/                       11 sub-agent definitions (8 primary + 3 backups)
   local-lightweight-code-review.agent.md  Fast implementation review
   local-lightweight-risk-review.agent.md  Fast semantic/adversarial review
   local-readability-reviewer.agent.md  Naming, clarity, organization, docs
   local-code-reviewer.agent.md         Correctness, idiom, patterns, test quality
   local-critical-reviewer.agent.md     Adversarial: bugs, security, perf, edge cases, structural design
+  local-critical-reviewer-sol.agent.md Sol backup for the Critical Reviewer
   local-deep-reviewer.agent.md         Spec/math arbiter: multi-file invariants, tie-breaker
+  local-deep-reviewer-sonnet.agent.md  Sonnet backup for the Deep Reviewer
   local-integration-reviewer.agent.md  Bounded cross-module contract tracing
   local-qa-tester.agent.md             Actually runs the code, reports repro steps
+  local-qa-tester-sol.agent.md         Sol backup for the QA Tester
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
 install.sh                    Copies agents + merges the playbook into ~/.copilot/
 uninstall.sh                  Removes this repo's agents (leaves others alone)
@@ -119,7 +165,8 @@ After code is written, or when you ask the lead to
      exclusions, then run the full five-reviewer team. Lightweight escalation is
      a routing handoff inside the current round, not an additional completed round.
 4. **Full fan-out when needed** — all five full reviewers run in parallel. The QA
-   tester joins only when runtime evidence is warranted.
+   tester joins only when runtime evidence is warranted. Use the corresponding
+   backup in place of an unavailable Astra or Opus role, not alongside it.
 5. **Common evidence contract** — each full reviewer reports severity, location,
    claim, evidence, impact, minimal fix, and confidence. Deep review adds the
    governing authority; Integration adds both sides of the affected contract.
@@ -199,6 +246,10 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
   [Customization](#customization)).
 - To see which model IDs your account can use, run `/model` inside a `copilot`
   session, then match the agent `model:` fields to that list.
+- Astra is optional if your account can use `gpt-6.1-sol`: the two shipped Sol
+  backups cover its review and QA roles. Opus 5.5 is optional if your account can
+  use `claude-sonnet-5.5` for the Deep Reviewer backup. Other roles still require their
+  configured models or an explicitly chosen replacement.
 - `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
   and by the self-checks).
 
@@ -214,6 +265,8 @@ cd copilot-review-team
 
 Then start a fresh `copilot` session — the lead agent picks up the team
 automatically. If you're not sure it loaded, ask: *"what agents do you have?"*
+The installer copies all eleven definitions, including the Sol and Sonnet backups; there is
+no separate backup installation step.
 
 > **NOTE — your existing `copilot-instructions.md` is preserved.** The installer
 > merges the playbook in as a **marker-delimited managed block**; anything you wrote
@@ -258,10 +311,17 @@ $EDITOR agents/local-readability-reviewer.agent.md
 ./install.sh        # re-run to push the change into ~/.copilot/
 ```
 
-If a referenced model isn't available to your account, point that agent at one that
-is. When swapping, preserve independent family counterweights among the
+For Astra or Opus 5.5 availability problems, use the shipped `-sol` or `-sonnet`
+backups first; no frontmatter edits are needed. For other unavailable models, point the affected
+agent at one your account can use. When swapping, preserve independent family counterweights among the
 judgment-producing reviewers; no single family should dominate every review lens
 or its own semantic tie-break.
+
+If you change the Critical Reviewer, QA Tester, or Deep Reviewer prompt or tools,
+update its primary and backup files together. Their role bodies and tool grants should remain
+identical; only the frontmatter name, model, and variant description differ.
+Keep both agent names in the README and playbook tables, then run
+`./scripts/validate.sh` before reinstalling.
 
 ### Tracking agent changes
 

@@ -71,6 +71,12 @@ else
   fail "tool policy unit tests"
   printf '%s\n' "$tools_test_output"
 fi
+if reviewer_count_test_output="$(python3 scripts/_test_validate_reviewer_counts.py 2>&1)"; then
+  pass "reviewer count unit tests (scripts/_test_validate_reviewer_counts.py)"
+else
+  fail "reviewer count unit tests"
+  printf '%s\n' "$reviewer_count_test_output"
+fi
 
 # --- C3: team table roster matches agent files ---
 # Model IDs are single-source in each agent's frontmatter; there is no model
@@ -84,10 +90,11 @@ else
 fi
 
 # --- C4: reviewer-count phrasing (fork-friendly) ---
-# Derive the reviewer count N from the actual files rather than hard-coding 5,
+# Derive the primary reviewer count N from the actual files rather than hard-coding 5,
 # so a fork that adds/removes a reviewer still passes as long as it is
-# internally consistent. We then assert every reviewer body and every count
+# internally consistent. We then assert every primary and backup reviewer body and every count
 # phrasing in the docs agrees with N.
+# The "-sol"/"-sonnet" backups replace existing roles, so they do not add to this count.
 echo "== C4: reviewer count phrasing =="
 reviewer_count="$(find agents -name 'local-*-reviewer.agent.md' | wc -l | tr -d ' ')"
 if [ "$reviewer_count" -ge 1 ]; then
@@ -111,7 +118,8 @@ n_word="$(num2word "$reviewer_count")"
 count_alt="$reviewer_count"
 [ -n "$n_word" ] && count_alt="$reviewer_count|$n_word"
 
-for r in agents/local-*-reviewer.agent.md; do
+for r in agents/local-*-reviewer.agent.md agents/local-*-reviewer-*.agent.md; do
+  [ -f "$r" ] || continue
   if grep -qE "one of ($count_alt) reviewers" "$r"; then
     pass "$(basename "$r") agrees with reviewer count ($reviewer_count)"
   else

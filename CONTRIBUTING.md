@@ -35,6 +35,20 @@ anything.
   `git log --follow -p agents/local-*.agent.md` is the per-agent evolution log — no
   separate changelog needed.)
 
+- **Keep primary/backup pairs in sync.** `local-critical-reviewer-sol` and
+  `local-qa-tester-sol` replace their Astra primaries; `local-deep-reviewer-sonnet`
+  replaces its Opus 5.5 primary when that model is unavailable. They are not
+  additional review or QA roles. Maintain identical
+  role bodies and tool grants in each pair. Only frontmatter names, model IDs,
+  and variant descriptions should differ. Update both README and playbook
+  roster rows when adding or renaming a variant. The Sol Critical Reviewer can
+  share the developer's model, so do not remove the independent Claude/Grok
+  counterweights to compensate. The Sonnet Deep Reviewer preserves its
+  authority/evidence requirements but may share the Readability Reviewer's model;
+  do not claim Opus-equivalent capability or treat unresolved proofs as approvals.
+  Do not reinterpret unrelated failures as
+  model unavailability.
+
 - **Bump the `VERSION` file when shipping changes.** It holds a single semver line
   (e.g. `1.0.0`). `install.sh` reads it to stamp the install and to print a
   `version -> version` change summary on upgrade. The install manifest
@@ -50,10 +64,16 @@ anything.
 
   This validates script syntax, agent frontmatter, that the playbook team table
   lists exactly the agents on disk, least-privilege tool grants, reviewer-count
-  phrasing, and the playbook-merge helper's unit tests (and runs `shellcheck` if
+  phrasing (primary review roles, not backup definitions), and the
+  playbook-merge helper's unit tests (and runs `shellcheck` if
   you have it installed). The same script runs in CI on every push and PR. Expect
   one `PASS`/`FAIL`/`SKIP` line per check and a
   final summary; the exit code is nonzero if any check fails.
+  The Sol and Sonnet backups are included in frontmatter, roster, and tool-policy checks.
+  Reviewer-count checks validate both primary and backup reviewer prompts against
+  the primary role count, with regression coverage for forks that change the team.
+  When editing a paired prompt, also compare its body and tools with its primary;
+  the self-checks do not currently enforce prompt-body parity.
 
 - **Don't commit anything private.** No internal repo names, secrets, tokens, or
   org-specific conventions in the shared files.
