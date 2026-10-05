@@ -1,7 +1,7 @@
 ---
-name: local-critical-reviewer
-description: "Primary Astra Critical Reviewer: adversarial review for bugs, security, performance, edge cases, and structural design flaws. Sol backup: local-critical-reviewer-sol."
-model: gpt-6-astra
+name: local-critical-reviewer-sol
+description: "GPT-6.1 Sol backup for the Astra Critical Reviewer: adversarial review for bugs, security, performance, edge cases, and structural design flaws."
+model: gpt-6.1-sol
 tools:
   - read
   - search

@@ -6,8 +6,8 @@ parser in _lib_parsing) and asserts the team's privilege invariants:
 
   - every full reviewer and lightweight review agent has `read` and `search`
     but NOT `edit`
-    (reviewers must never be able to modify code)
-  - local-qa-tester has `shell`
+    (including the Sol Critical Reviewer backup)
+  - local-qa-tester and its Sol backup have `shell`
 
 The rules below are intentionally explicit and easy to update if the team's
 privilege model changes.
@@ -27,8 +27,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # reviewers and lightweight review agents are handled by naming rules below.
 REQUIRED = {
     "local-qa-tester": ["shell"],
+    "local-qa-tester-sol": ["shell"],
 }
-# Rule applied to every full reviewer whose name ends in "-reviewer".
+# Applied to primary "-reviewer" agents and the explicitly named Sol backup.
 REVIEWER_REQUIRED = ["read", "search"]
 REVIEWER_FORBIDDEN = ["edit"]
 LIGHTWEIGHT_REVIEW_TOOLS = {"read", "search"}
@@ -37,7 +38,7 @@ LIGHTWEIGHT_REVIEW_TOOLS = {"read", "search"}
 def tool_policy_errors(name, tools):
     """Return privilege-policy errors for one parsed agent tool list."""
     errors = []
-    if name.endswith("-reviewer"):
+    if name.endswith("-reviewer") or name == "local-critical-reviewer-sol":
         for tool in REVIEWER_REQUIRED:
             if tool not in tools:
                 errors.append("reviewer missing required tool '%s'" % tool)

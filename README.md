@@ -74,6 +74,37 @@ are read from those files.
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5.5` | Strong base model for deep spec/math reasoning; arbiter when reviewers disagree |
 | `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `grok-4.7` | Third model family + large context window for producer/consumer analysis |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6-astra` | Long-horizon repro work, cold-env build bring-up, and driving sanitizers/benchmarks benefit from Astra's strong agentic tool use |
+| `local-critical-reviewer-sol` | Backup Critical Reviewer; same role and guardrails | `gpt-6.1-sol` | Use when Astra is unavailable; retains the role but may share the developer's model |
+| `local-qa-tester-sol` | Backup QA Tester; same execution and evidence contract | `gpt-6.1-sol` | Use when Astra is unavailable |
+
+The `-sol` agents are self-contained backups, not extra team members. The full
+team still has five review roles and one optional QA role; ten installed agent
+definitions do not mean ten parallel calls. See [Astra backups](#astra-backups)
+for selection, failure handling, and the model-diversity trade-off.
+
+### Astra backups
+
+Keep the Astra versions as primary. If Astra is absent from the current model
+catalog, or an invocation fails specifically because that model is unavailable,
+the lead substitutes the matching GPT-6.1 Sol agent:
+
+| Primary | Backup |
+|---|---|
+| `local-critical-reviewer` | `local-critical-reviewer-sol` |
+| `local-qa-tester` | `local-qa-tester-sol` |
+
+This is **playbook-directed routing, not an automatic CLI model fallback**. The
+lead states which backup it uses and passes the same task, diff, constraints,
+and evidence to it. Run only one variant per role in each phase; an unavailable
+model attempt is not a completed review round. Unrelated failures follow the
+normal retry policy, not this substitution rule. If Sol is also unavailable,
+report the blocked role rather than silently skipping it or choosing another
+model.
+
+The Sol Critical Reviewer may share the developer's model and the Code
+Reviewer's model. It preserves the adversarial role, not Astra's model-level
+independence; retain the Claude and Grok review lenses. The Sol QA Tester keeps
+the same execution limits and exact-scenario evidence contract.
 
 The `local-` prefix is a namespace convention marking these as user-installed
 agents. The installer only copies `local-*.agent.md` files, so any custom agent you
@@ -82,15 +113,17 @@ add must follow that naming to be picked up.
 ## What's in here
 
 ```
-agents/                       8 sub-agent definitions
+agents/                       10 sub-agent definitions (8 primary + 2 backups)
   local-lightweight-code-review.agent.md  Fast implementation review
   local-lightweight-risk-review.agent.md  Fast semantic/adversarial review
   local-readability-reviewer.agent.md  Naming, clarity, organization, docs
   local-code-reviewer.agent.md         Correctness, idiom, patterns, test quality
   local-critical-reviewer.agent.md     Adversarial: bugs, security, perf, edge cases, structural design
+  local-critical-reviewer-sol.agent.md Sol backup for the Critical Reviewer
   local-deep-reviewer.agent.md         Spec/math arbiter: multi-file invariants, tie-breaker
   local-integration-reviewer.agent.md  Bounded cross-module contract tracing
   local-qa-tester.agent.md             Actually runs the code, reports repro steps
+  local-qa-tester-sol.agent.md         Sol backup for the QA Tester
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
 install.sh                    Copies agents + merges the playbook into ~/.copilot/
 uninstall.sh                  Removes this repo's agents (leaves others alone)
@@ -119,7 +152,8 @@ After code is written, or when you ask the lead to
      exclusions, then run the full five-reviewer team. Lightweight escalation is
      a routing handoff inside the current round, not an additional completed round.
 4. **Full fan-out when needed** — all five full reviewers run in parallel. The QA
-   tester joins only when runtime evidence is warranted.
+   tester joins only when runtime evidence is warranted. Use the corresponding
+   Sol backup in place of an unavailable Astra role, not alongside it.
 5. **Common evidence contract** — each full reviewer reports severity, location,
    claim, evidence, impact, minimal fix, and confidence. Deep review adds the
    governing authority; Integration adds both sides of the affected contract.
@@ -199,6 +233,9 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
   [Customization](#customization)).
 - To see which model IDs your account can use, run `/model` inside a `copilot`
   session, then match the agent `model:` fields to that list.
+- Astra is optional if your account can use `gpt-6.1-sol`: the two shipped Sol
+  backups cover its review and QA roles. Other roles still require their
+  configured models or an explicitly chosen replacement.
 - `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
   and by the self-checks).
 
@@ -214,6 +251,8 @@ cd copilot-review-team
 
 Then start a fresh `copilot` session — the lead agent picks up the team
 automatically. If you're not sure it loaded, ask: *"what agents do you have?"*
+The installer copies all ten definitions, including both Sol backups; there is
+no separate backup installation step.
 
 > **NOTE — your existing `copilot-instructions.md` is preserved.** The installer
 > merges the playbook in as a **marker-delimited managed block**; anything you wrote
@@ -258,10 +297,17 @@ $EDITOR agents/local-readability-reviewer.agent.md
 ./install.sh        # re-run to push the change into ~/.copilot/
 ```
 
-If a referenced model isn't available to your account, point that agent at one that
-is. When swapping, preserve independent family counterweights among the
+For Astra availability problems, use the shipped `-sol` backups first; no
+frontmatter edits are needed. For other unavailable models, point the affected
+agent at one your account can use. When swapping, preserve independent family counterweights among the
 judgment-producing reviewers; no single family should dominate every review lens
 or its own semantic tie-break.
+
+If you change the Critical Reviewer or QA Tester prompt or tools, update its
+primary and Sol files together. Their role bodies and tool grants should remain
+identical; only the frontmatter name, model, and variant description differ.
+Keep both agent names in the README and playbook tables, then run
+`./scripts/validate.sh` before reinstalling.
 
 ### Tracking agent changes
 
