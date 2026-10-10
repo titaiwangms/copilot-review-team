@@ -18,7 +18,7 @@ body:
     id: copilot-version
     attributes:
       label: Copilot CLI version
-      placeholder: "e.g. 1.0.60"
+      placeholder: "e.g. 1.0.95"
   - type: dropdown
     id: area
     attributes:
@@ -41,7 +41,9 @@ body:
     attributes:
       label: Models involved (if relevant)
       description: |
-        Include the agent name, model ID, exact error, and whether it appears in
-        your current model catalog. For Astra or Opus failures, note whether the
-        matching -sol or -sonnet backup was used and what happened; do not include
-        tokens or credentials.
+        Include the primary agent name, configured model candidates, exact error,
+        and which candidates appear in your current model catalog. For Astra or
+        Opus failures, describe native Sol/Sonnet fallback under the same primary
+        agent name; report the actual model only if runtime evidence identifies it.
+        Mention a named -sol or -sonnet variant only if explicitly selected.
+        Do not include tokens or credentials.

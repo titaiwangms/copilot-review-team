@@ -1,6 +1,6 @@
 ---
 name: local-critical-reviewer-sol
-description: "GPT-6.1 Sol backup for the Astra Critical Reviewer: adversarial review for bugs, security, performance, edge cases, and structural design flaws."
+description: "Explicit-selection GPT-6.1 Sol compatibility variant of the Critical Reviewer: adversarial review for bugs, security, performance, edge cases, and structural design flaws. Normal native fallback uses the primary agent name."
 model: gpt-6.1-sol
 tools:
   - read

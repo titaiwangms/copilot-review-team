@@ -1,7 +1,10 @@
 ---
 name: local-qa-tester
-description: "Primary Astra QA Tester: runs code end-to-end, verifies behavior, and catches runtime failures. Sol backup: local-qa-tester-sol."
-model: gpt-6-astra
+description: "QA Tester: runs code end-to-end, verifies behavior, and catches runtime failures. Prefers Astra with native Sol fallback."
+models:
+  - gpt-6-astra
+  - gpt-6.1-sol
+modelPolicy: required
 tools:
   - read
   - edit

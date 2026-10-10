@@ -1,7 +1,10 @@
 ---
 name: local-deep-reviewer
-description: "Primary Opus Deep Reviewer: spec adherence, mathematical correctness, and multi-file invariants grounded in authoritative references. Sonnet backup: local-deep-reviewer-sonnet."
-model: claude-opus-5.5
+description: "Deep Reviewer: spec adherence, mathematical correctness, and multi-file invariants grounded in authoritative references. Prefers Opus with native Sonnet fallback."
+models:
+  - claude-opus-5.5
+  - claude-sonnet-5.5
+modelPolicy: required
 tools:
   - read
   - search

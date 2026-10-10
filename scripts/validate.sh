@@ -46,7 +46,7 @@ else
   fail "agent frontmatter check"
 fi
 # Run the frontmatter checker's own unit tests so CI exercises the validation
-# logic (malformed / empty / list / block-scalar model values), not just the
+# logic (scalar models, ordered model lists, and enforcement policies), not just the
 # happy path. Capture output so a PASS stays quiet but a FAILURE shows which
 # cases broke.
 if frontmatter_test_output="$(python3 scripts/_test_check_frontmatter.py 2>&1)"; then
