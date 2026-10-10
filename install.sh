@@ -19,8 +19,8 @@
 # Pruning is driven ONLY by the previous manifest's AGENT= entries (never by
 # globbing ~/.copilot/agents/), so unrelated local-* agents are left untouched.
 #
-# Model selection: each agent's model lives in its own frontmatter `model:` line
-# (the single source of truth). To use different models, edit that line and
+# Model selection: each agent's model lives in its frontmatter `model:` or `models:`
+# (the single source of truth). To use different models, edit that field and
 # re-run this installer.
 
 set -euo pipefail
@@ -132,7 +132,7 @@ install_file() {
 
 # --- Agent source directory ---
 # Agents are installed straight from this repo's agents/ directory; each agent's
-# model is the `model:` line in its own frontmatter (the single source of truth).
+# model is defined by its frontmatter (the single source of truth).
 AGENT_SRC_DIR="$SRC_DIR/agents"
 
 # --- Agents ---

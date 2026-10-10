@@ -1,6 +1,6 @@
 ---
 name: local-deep-reviewer-sonnet
-description: "Claude Sonnet 5.5 backup for the Opus Deep Reviewer: spec adherence, mathematical correctness, and multi-file invariants grounded in authoritative references."
+description: "Explicit-selection Claude Sonnet 5.5 compatibility variant of the Deep Reviewer: spec adherence, mathematical correctness, and multi-file invariants grounded in authoritative references. Normal native fallback uses the primary agent name."
 model: claude-sonnet-5.5
 tools:
   - read

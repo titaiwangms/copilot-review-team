@@ -26,20 +26,24 @@ anything.
   judgment-producing reviewers do not all share one family's blind spots. A reviewer
   may share the author's family, but the full team must retain strong independent
   families for clarity, semantic/spec adjudication, and integration tracing (see the
-  model-diversity notes in the README and playbook). Each agent's model is the `model:`
-  line in its own `agents/local-*.agent.md` frontmatter — the single source of truth.
-  Edit it there and re-run `./install.sh`.
+  model-diversity notes in the README and playbook). Each agent's model configuration
+  is the `model:` scalar or ordered `models:` block list in its own
+  `agents/local-*.agent.md` frontmatter — the single source of truth.
+  Edit it there and re-run `./install.sh`. Keep `modelPolicy: required` on the
+  three native-fallback primary roles so exhausted candidates cannot silently
+  inherit the session model.
 
 - **Keep agents self-contained.** Each `local-*.agent.md` is a fresh context — don't
   assume it can see conversation state. (It also keeps each agent's git history clean:
   `git log --follow -p agents/local-*.agent.md` is the per-agent evolution log — no
   separate changelog needed.)
 
-- **Keep primary/backup pairs in sync.** `local-critical-reviewer-sol` and
-  `local-qa-tester-sol` replace their Astra primaries; `local-deep-reviewer-sonnet`
-  replaces its Opus 5.5 primary when that model is unavailable. They are not
-  additional review or QA roles. Maintain identical
-  role bodies and tool grants in each pair. Only frontmatter names, model IDs,
+- **Keep primary/variant pairs in sync.** The primary Critical/QA agents select
+  Astra then Sol natively; Deep selects Opus then Sonnet. The separately named
+  `local-critical-reviewer-sol`, `local-qa-tester-sol`, and
+  `local-deep-reviewer-sonnet` are explicit-selection compatibility variants, not
+  normal fallback dispatch or additional review/QA roles. Maintain identical
+  role bodies and tool grants in each pair. Only frontmatter names, model configuration,
   and variant descriptions should differ. Update both README and playbook
   roster rows when adding or renaming a variant. The Sol Critical Reviewer can
   share the developer's model, so do not remove the independent Claude/Grok

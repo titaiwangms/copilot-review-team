@@ -1,6 +1,6 @@
 ---
 name: local-qa-tester-sol
-description: "GPT-6.1 Sol backup for the Astra QA Tester: runs code end-to-end, verifies behavior, and reports runtime evidence."
+description: "Explicit-selection GPT-6.1 Sol compatibility variant of the QA Tester: runs code end-to-end, verifies behavior, and reports runtime evidence. Normal native fallback uses the primary agent name."
 model: gpt-6.1-sol
 tools:
   - read
