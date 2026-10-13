@@ -92,9 +92,9 @@ fi
 # --- C4: reviewer-count phrasing (fork-friendly) ---
 # Derive the primary reviewer count N from the actual files rather than hard-coding 5,
 # so a fork that adds/removes a reviewer still passes as long as it is
-# internally consistent. We then assert every primary and backup reviewer body and every count
+# internally consistent. We then assert every reviewer body and every count
 # phrasing in the docs agrees with N.
-# The "-sol"/"-sonnet" backups replace existing roles, so they do not add to this count.
+# Alternate reviewer files in forks do not add to the primary role count.
 echo "== C4: reviewer count phrasing =="
 reviewer_count="$(find agents -name 'local-*-reviewer.agent.md' | wc -l | tr -d ' ')"
 if [ "$reviewer_count" -ge 1 ]; then

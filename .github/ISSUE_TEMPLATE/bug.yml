@@ -41,9 +41,7 @@ body:
     attributes:
       label: Models involved (if relevant)
       description: |
-        Include the primary agent name, configured model candidates, exact error,
-        and which candidates appear in your current model catalog. For Astra or
-        Opus failures, describe native Sol/Sonnet fallback under the same primary
-        agent name; report the actual model only if runtime evidence identifies it.
-        Mention a named -sol or -sonnet variant only if explicitly selected.
+        Include the primary agent name, configured model, exact error,
+        and whether that model appears in your current model catalog.
+        Report the actual model only if runtime evidence identifies it.
         Do not include tokens or credentials.

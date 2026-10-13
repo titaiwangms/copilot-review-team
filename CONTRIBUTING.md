@@ -30,7 +30,7 @@ anything.
   is the `model:` scalar or ordered `models:` block list in its own
   `agents/local-*.agent.md` frontmatter — the single source of truth.
   Edit it there and re-run `./install.sh`. Keep `modelPolicy: required` on the
-  three native-fallback primary roles so exhausted candidates cannot silently
+  three fixed-model primary roles so an unavailable model cannot silently
   inherit the session model.
 
 - **Keep agents self-contained.** Each `local-*.agent.md` is a fresh context — don't
@@ -38,18 +38,13 @@ anything.
   `git log --follow -p agents/local-*.agent.md` is the per-agent evolution log — no
   separate changelog needed.)
 
-- **Keep primary/variant pairs in sync.** The primary Critical/QA agents select
-  Astra then Sol natively; Deep selects Opus then Sonnet. The separately named
-  `local-critical-reviewer-sol`, `local-qa-tester-sol`, and
-  `local-deep-reviewer-sonnet` are explicit-selection compatibility variants, not
-  normal fallback dispatch or additional review/QA roles. Maintain identical
-  role bodies and tool grants in each pair. Only frontmatter names, model configuration,
-  and variant descriptions should differ. Update both README and playbook
-  roster rows when adding or renaming a variant. The Sol Critical Reviewer can
-  share the developer's model, so do not remove the independent Claude/Grok
-  counterweights to compensate. The Sonnet Deep Reviewer preserves its
-  authority/evidence requirements but may share the Readability Reviewer's model;
-  do not claim Opus-equivalent capability or treat unresolved proofs as approvals.
+- **Keep model documentation in sync.** Critical/QA use GPT-6.1 Sol; Deep uses
+  Claude Sonnet 5.5. There are no automatic model fallbacks or duplicate model
+  variants. Update both README and playbook roster rows when adding or renaming
+  an agent. The Critical Reviewer can share the developer's model, so retain
+  the independent Claude/Grok counterweights. The Deep Reviewer preserves its
+  authority/evidence requirements but shares the Readability Reviewer's model;
+  do not treat unresolved proofs as approvals.
   Do not reinterpret unrelated failures as
   model unavailability.
 
@@ -68,16 +63,13 @@ anything.
 
   This validates script syntax, agent frontmatter, that the playbook team table
   lists exactly the agents on disk, least-privilege tool grants, reviewer-count
-  phrasing (primary review roles, not backup definitions), and the
+  phrasing, and the
   playbook-merge helper's unit tests (and runs `shellcheck` if
   you have it installed). The same script runs in CI on every push and PR. Expect
   one `PASS`/`FAIL`/`SKIP` line per check and a
   final summary; the exit code is nonzero if any check fails.
-  The Sol and Sonnet backups are included in frontmatter, roster, and tool-policy checks.
-  Reviewer-count checks validate both primary and backup reviewer prompts against
-  the primary role count, with regression coverage for forks that change the team.
-  When editing a paired prompt, also compare its body and tools with its primary;
-  the self-checks do not currently enforce prompt-body parity.
+  Reviewer-count checks validate reviewer prompts against the primary role count,
+  with regression coverage for forks that change the team or add alternate prompts.
 
 - **Don't commit anything private.** No internal repo names, secrets, tokens, or
   org-specific conventions in the shared files.

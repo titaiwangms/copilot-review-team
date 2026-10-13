@@ -20,7 +20,7 @@ class ReviewerCountTests(unittest.TestCase):
             + '\nexit "$FAILURES"\n'
         )
 
-    def run_check(self, primary_count=5, backups=None):
+    def run_check(self, primary_count=5, alternates=None):
         with tempfile.TemporaryDirectory(prefix="reviewer-count-test-") as tmp:
             root = Path(tmp)
             agents = root / "agents"
@@ -30,7 +30,7 @@ class ReviewerCountTests(unittest.TestCase):
                 (agents / f"local-test-{index}-reviewer.agent.md").write_text(
                     f"You are one of {count_word} reviewers.\n", encoding="utf-8"
                 )
-            for name, wording in (backups or {}).items():
+            for name, wording in (alternates or {}).items():
                 (agents / name).write_text(wording + "\n", encoding="utf-8")
             (root / "README.md").write_text(
                 f"The team has {count_word} reviewers.\n", encoding="utf-8"
@@ -47,24 +47,22 @@ class ReviewerCountTests(unittest.TestCase):
                 check=False,
             )
 
-    def test_backups_do_not_increase_primary_count(self):
+    def test_alternates_do_not_increase_primary_count(self):
         result = self.run_check(
-            backups={
-                "local-critical-reviewer-sol.agent.md": "You are one of five reviewers.",
-                "local-deep-reviewer-sonnet.agent.md": "You are one of 5 reviewers.",
-                "local-qa-tester-sol.agent.md": "You are the QA tester.",
+            alternates={
+                "local-test-reviewer-alternate.agent.md": "You are one of five reviewers.",
+                "local-other-reviewer-alternate.agent.md": "You are one of 5 reviewers.",
+                "local-qa-tester.agent.md": "You are the QA tester.",
             }
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("found 5 reviewer agent file(s)", result.stdout)
-        for name in ("local-critical-reviewer-sol", "local-deep-reviewer-sonnet"):
+        for name in ("local-test-reviewer-alternate", "local-other-reviewer-alternate"):
             self.assertIn(f"{name}.agent.md agrees with reviewer count (5)", result.stdout)
-        self.assertNotIn("local-qa-tester-sol", result.stdout)
+        self.assertNotIn("local-qa-tester", result.stdout)
 
-    def test_six_primary_roles_reject_stale_backup(self):
+    def test_six_primary_roles_reject_stale_alternate(self):
         for name in (
-            "local-critical-reviewer-sol.agent.md",
-            "local-deep-reviewer-sonnet.agent.md",
             "local-test-reviewer-alternate.agent.md",
         ):
             with self.subTest(name=name):
@@ -75,17 +73,17 @@ class ReviewerCountTests(unittest.TestCase):
                     f"FAIL: {name} does not say 'one of 6 reviewers'", result.stdout
                 )
 
-    def test_matching_word_and_digit_backup_counts_pass(self):
+    def test_matching_word_and_digit_alternate_counts_pass(self):
         result = self.run_check(
             6,
             {
-                "local-critical-reviewer-sol.agent.md": "You are one of six reviewers.",
-                "local-deep-reviewer-sonnet.agent.md": "You are one of 6 reviewers.",
+                "local-test-reviewer-alternate.agent.md": "You are one of six reviewers.",
+                "local-other-reviewer-alternate.agent.md": "You are one of 6 reviewers.",
             },
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_fork_without_backups_passes(self):
+    def test_fork_without_alternates_passes(self):
         result = self.run_check()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("FAIL:", result.stdout)

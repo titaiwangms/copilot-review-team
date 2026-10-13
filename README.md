@@ -70,59 +70,40 @@ are read from those files.
 | `local-lightweight-risk-review` | Fast semantic intent, failure modes, and local contracts | `claude-sonnet-5.5` | Strong reasoning and a different family from a GPT developer |
 | `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-5.5` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
 | `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-6.1-sol` | Local implementation correctness and test-quality lens |
-| `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-6-astra`, then `gpt-6.1-sol` | Prefers an architecture adversary distinct from the default developer model; Sol preserves the role |
-| `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-opus-5.5`, then `claude-sonnet-5.5` | Prefers Opus for spec/math reasoning; Sonnet preserves the Claude lens |
+| `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-6.1-sol` | GPT-6.1 Sol provides the adversarial review lens |
+| `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-sonnet-5.5` | Claude Sonnet 5.5 provides the authority-grounded spec/math lens |
 | `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `grok-4.7` | Third model family + large context window for producer/consumer analysis |
-| `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6-astra`, then `gpt-6.1-sol` | Prefers Astra's long-horizon agentic tool use; Sol preserves the execution contract |
-| `local-critical-reviewer-sol` | Explicit-selection Critical Reviewer variant | `gpt-6.1-sol` | Compatibility variant; normal Sol fallback uses the primary name |
-| `local-qa-tester-sol` | Explicit-selection QA Tester variant | `gpt-6.1-sol` | Compatibility variant; normal Sol fallback uses the primary name |
-| `local-deep-reviewer-sonnet` | Explicit-selection Deep Reviewer variant | `claude-sonnet-5.5` | Compatibility variant; normal Sonnet fallback uses the primary name |
+| `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6.1-sol` | GPT-6.1 Sol provides the execution instrument |
 
-The `-sol` and `-sonnet` agents are self-contained backups, not extra team members.
-The full team still has five review roles and one optional QA role; eleven installed
-agent definitions do not mean eleven parallel calls. See [Model backups](#model-backups)
-for selection, failure handling, and the model-diversity trade-off.
+The repository ships eight agents: two lightweight reviewers, five full
+reviewers, and one optional QA tester. There are no duplicate model variants.
+See [Model selection](#model-selection) for failure handling and the
+model-diversity trade-off.
 
-### Model backups
+### Model selection
 
-The Critical Reviewer and QA Tester declare `models: [gpt-6-astra, gpt-6.1-sol]`
+The Critical Reviewer and QA Tester declare `models: [gpt-6.1-sol]`
 (written as block lists); the Deep Reviewer declares
-`models: [claude-opus-5.5, claude-sonnet-5.5]`. Copilot CLI selects the first
-available candidate under the same agent name, without the lead having to
-discover and dispatch a separate backup agent.
+`models: [claude-sonnet-5.5]`. Each primary uses a fixed model, with no automatic
+model fallback. Do not invent backup agent names or silently omit a blocked role.
 
-| Primary | Explicit-selection variant | Variant model |
-|---|---|---|
-| `local-critical-reviewer` | `local-critical-reviewer-sol` | `gpt-6.1-sol` |
-| `local-qa-tester` | `local-qa-tester-sol` | `gpt-6.1-sol` |
-| `local-deep-reviewer` | `local-deep-reviewer-sonnet` | `claude-sonnet-5.5` |
+These three primary agents retain `modelPolicy: required`: use the authored
+fixed model, not an unlisted session model or a per-call override.
+Use the primary agent name and omit per-call model overrides. If its model
+is unavailable, report the role as blocked. Timeouts, malformed reports, and
+test failures are not reasons to switch models. Report actual execution only
+when runtime evidence is available.
 
-Only the backups in this table are shipped by this reviewer-only repository.
-Do not invent other variant names or silently omit a blocked role.
-
-These three primary agents use `modelPolicy: required`: dispatch must use one
-of their authored candidates, and must fail rather than silently inherit the
-session model if neither is available. Per the CLI reference, `required`
-constrains dispatch to the authored models rather than allowing model overrides.
-This is **native model selection fallback**, not retrying a timeout, malformed
-report, or test failure.
-Use the primary agent name and omit per-call model overrides. If dispatch
-cannot resolve either candidate, report the role as blocked. Do not infer
-which model ran from the agent name; report it only when runtime evidence is
-available.
-
-The separately named `-sol` and `-sonnet` agents remain available for explicit
-selection and compatibility; they are not required for normal fallback.
 Run only one agent per role in each phase.
 
-The Sol Critical Reviewer may share the developer's model and the Code
-Reviewer's model. It preserves the adversarial role, not Astra's model-level
-independence; retain the Claude and Grok review lenses. The Sol QA Tester keeps
+The Critical Reviewer shares the Code Reviewer's GPT-6.1 Sol model and may share
+the developer's model; retain the independent Claude and Grok review lenses.
+The QA Tester keeps
 the same execution limits and exact-scenario evidence contract.
 
-The Sonnet Deep Reviewer preserves the Claude family and the authority-grounded
-role, not a guarantee of Opus-equivalent capability. It may share the Readability
-Reviewer's model. Unresolved proofs or spec disputes remain attributed,
+The Deep Reviewer and Readability Reviewer use Claude Sonnet 5.5. The Deep
+Reviewer retains its authority-grounded role and evidence requirements.
+Unresolved proofs or spec disputes remain attributed,
 non-blocking open questions rather than unsupported approvals.
 
 The `local-` prefix is a namespace convention marking these as user-installed
@@ -132,18 +113,15 @@ add must follow that naming to be picked up.
 ## What's in here
 
 ```
-agents/                       11 sub-agent definitions (8 primary + 3 backups)
+agents/                       8 sub-agent definitions
   local-lightweight-code-review.agent.md  Fast implementation review
   local-lightweight-risk-review.agent.md  Fast semantic/adversarial review
   local-readability-reviewer.agent.md  Naming, clarity, organization, docs
   local-code-reviewer.agent.md         Correctness, idiom, patterns, test quality
   local-critical-reviewer.agent.md     Adversarial: bugs, security, perf, edge cases, structural design
-  local-critical-reviewer-sol.agent.md Sol backup for the Critical Reviewer
   local-deep-reviewer.agent.md         Spec/math arbiter: multi-file invariants, tie-breaker
-  local-deep-reviewer-sonnet.agent.md  Sonnet backup for the Deep Reviewer
   local-integration-reviewer.agent.md  Bounded cross-module contract tracing
   local-qa-tester.agent.md             Actually runs the code, reports repro steps
-  local-qa-tester-sol.agent.md         Sol backup for the QA Tester
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
 install.sh                    Copies agents + merges the playbook into ~/.copilot/
 uninstall.sh                  Removes this repo's agents (leaves others alone)
@@ -173,9 +151,8 @@ After code is written, or when you ask the lead to
      a routing handoff inside the current round, not an additional completed round.
 4. **Full fan-out when needed** — all five full reviewers run in parallel. The QA
    tester joins only when runtime evidence is warranted. Keep the primary agent
-   names and omit per-call model overrides; native candidate lists handle Astra
-   or Opus availability. Named variants are for explicit selection only, never
-   additional parallel reviewers.
+   names and omit per-call model overrides; the required fixed model must be
+   available; otherwise report the role as blocked.
 5. **Common evidence contract** — each full reviewer reports severity, location,
    claim, evidence, impact, minimal fix, and confidence. Deep review adds the
    governing authority; Integration adds both sides of the affected contract.
@@ -256,9 +233,8 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
   [Customization](#customization)).
 - To see which model IDs your account can use, run `/model` inside a `copilot`
   session, then match the agent `model:` or `models:` fields to that list.
-- Astra is optional if your account can use `gpt-6.1-sol`: the two shipped Sol
-  candidate lists cover its review and QA roles. Opus 5.5 is optional if your account can
-  use `claude-sonnet-5.5` as the Deep Reviewer's fallback. Other roles still require their
+- The Critical Reviewer and QA Tester require `gpt-6.1-sol`; the Deep Reviewer
+  requires `claude-sonnet-5.5`. Other roles still require their
   configured models or an explicitly chosen replacement.
 - `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
   and by the self-checks).
@@ -275,8 +251,8 @@ cd copilot-review-team
 
 Then start a fresh `copilot` session — the lead agent picks up the team
 automatically. If you're not sure it loaded, ask: *"what agents do you have?"*
-The installer copies all eleven definitions, including the Sol and Sonnet backups; there is
-no separate backup installation step.
+The installer copies all eight definitions and removes previously shipped
+duplicate variants recorded in its manifest.
 
 > **NOTE — your existing `copilot-instructions.md` is preserved.** The installer
 > merges the playbook in as a **marker-delimited managed block**; anything you wrote
@@ -317,28 +293,26 @@ or ordered `models:` block list in that agent's
 
 ```bash
 # edit the model: line in the agent(s) you want to retarget, e.g.
-#   model: claude-sonnet-5.5   ->   model: claude-opus-5.5
+#   model: claude-sonnet-5.5   ->   model: gpt-6.1-sol
 $EDITOR agents/local-readability-reviewer.agent.md
 ./install.sh        # re-run to push the change into ~/.copilot/
 ```
 
-The three primary Astra/Opus roles already select their Sol/Sonnet fallback
-automatically; no frontmatter edits or alternate agent names are needed. To change
-their candidates, edit the `models:` block list in preference order and keep
+The three primary roles use fixed Sol/Sonnet models, without automatic fallback.
+To retarget them, edit the `models:` block list and keep
 `modelPolicy: required` to prevent unlisted-model substitution. The repository
-validator accepts bare model IDs in block lists, not inline YAML lists.
+validator accepts one or more bare model IDs in block lists, not inline YAML lists.
 
 For example, the Critical Reviewer and QA Tester use:
 
 ```yaml
 models:
-  - gpt-6-astra
   - gpt-6.1-sol
 modelPolicy: required
 ```
 
-The Deep Reviewer uses `claude-opus-5.5`, then `claude-sonnet-5.5`, with the
-same required policy. If neither candidate is accessible, dispatch is blocked
+The Deep Reviewer uses only `claude-sonnet-5.5`, with the
+same required policy. If the configured model is inaccessible, dispatch is blocked
 rather than silently selecting the session model.
 
 For other unavailable models, point the affected
@@ -346,10 +320,7 @@ agent at one your account can use. When swapping, preserve independent family co
 judgment-producing reviewers; no single family should dominate every review lens
 or its own semantic tie-break.
 
-If you change the Critical Reviewer, QA Tester, or Deep Reviewer prompt or tools,
-update its primary and backup files together. Their role bodies and tool grants should remain
-identical; only the frontmatter name, model configuration, and variant description differ.
-Keep both agent names in the README and playbook tables, then run
+If you add or rename an agent, keep the README and playbook tables in sync, then run
 `./scripts/validate.sh` before reinstalling.
 
 ### Tracking agent changes

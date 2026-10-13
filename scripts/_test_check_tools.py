@@ -52,8 +52,8 @@ class ToolPolicyTests(unittest.TestCase):
             tool_policy_errors("local-qa-tester", ["read"]),
         )
 
-    def test_backup_reviewers_use_full_reviewer_policy(self):
-        for name in ("local-critical-reviewer-sol", "local-deep-reviewer-sonnet"):
+    def test_full_reviewers_use_full_reviewer_policy(self):
+        for name in ("local-critical-reviewer", "local-deep-reviewer"):
             with self.subTest(name=name):
                 self.assertEqual(tool_policy_errors(name, ["read", "search", "shell"]), [])
                 self.assertIn(
@@ -65,8 +65,8 @@ class ToolPolicyTests(unittest.TestCase):
                     tool_policy_errors(name, ["read"]),
                 )
 
-    def test_sol_qa_requires_shell(self):
-        name = "local-qa-tester-sol"
+    def test_qa_accepts_edit_with_shell(self):
+        name = "local-qa-tester"
         self.assertEqual(tool_policy_errors(name, ["read", "edit", "search", "shell"]), [])
         self.assertIn(
             "missing required tool 'shell'",
