@@ -3,9 +3,9 @@
 # uninstall.sh — remove the Copilot CLI Review Team that install.sh placed in
 # ~/.copilot/.
 #
-# Safety: this removes ONLY explicit agent basenames — the union of this repo's
-# agents/local-*.agent.md and any recorded in the install manifest. It never
-# globs ~/.copilot/agents/, so unrelated local-* agents are left alone.
+# Safety: removes the core agents/local-*.agent.md names and core manifest
+# entries, plus optional agents/instructions recorded in the extras manifest.
+# It never globs deployed directories, so unrelated files are left alone.
 #
 # Usage:
 #   ./uninstall.sh [--dry-run] [--purge-playbook] [-h|--help]
@@ -20,6 +20,7 @@
 # file is removed.
 #
 # Backup directories (~/.copilot/.backup-*/) are never deleted.
+# Optional extras are removed using their separate manifest.
 #
 # --- end usage ---
 
@@ -30,6 +31,7 @@ COPILOT_DIR="${COPILOT_HOME:-$HOME/.copilot}"
 AGENTS_DIR="$COPILOT_DIR/agents"
 PLAYBOOK="$COPILOT_DIR/copilot-instructions.md"
 MANIFEST="$COPILOT_DIR/.copilot-review-team-manifest"
+BACKUP_DIR="$COPILOT_DIR/.backup-$(date +%Y%m%d-%H%M%S)-$$"
 
 DRY_RUN=0
 PLAYBOOK_ACTION="strip"
@@ -87,6 +89,8 @@ fi
 # partial uninstall. Skip the check under --dry-run since nothing is removed.
 if [ "$DRY_RUN" -eq 0 ]; then
   command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 1; }
+  python3 "$SRC_DIR/scripts/_manage_extras.py" check-remove "$COPILOT_DIR" \
+    "$BACKUP_DIR"
 fi
 
 # Strict basename validation, identical to install.sh. A shell glob `case` is NOT
@@ -156,6 +160,14 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "Agents that would be removed: $removed"
 else
   echo "Agents removed: $removed"
+fi
+
+# --- Optional agents and instructions, tracked separately from the review team. ---
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "  would: remove optional extras, if recorded in .copilot-review-team-extras-manifest"
+else
+  python3 "$SRC_DIR/scripts/_manage_extras.py" remove "$COPILOT_DIR" \
+    "$BACKUP_DIR"
 fi
 
 # --- Playbook ---

@@ -23,9 +23,10 @@ Treat them as your default review path after code is written and when the user
 asks you to review code, a diff, or a PR. You are the lead; you decide when and
 how to fan them out.
 
-This team **reviews** code — it does not design or build it. There is no architect,
-developer, or tech-writer here. If the user asks you to *implement* something, do
-that work yourself (you have the tools); the team is for review.
+The default team **reviews** code — it does not design or build it. If the user
+asks you to *implement* something, do that work yourself unless optional building
+agents were explicitly installed and their instructions call for delegation.
+The optional agents do not change the review routing below.
 
 ## The teams
 
@@ -318,9 +319,9 @@ or its own semantic tie-break.
 
 ## What the team is NOT
 
-- **Not a build team.** There is no architect, developer, or tech-writer. The teams
-  review code after it is written; they do not design or implement it. If asked
-  to build, do it yourself, then use the lightweight review path by default.
+- **Not a build team.** The default teams review code after it is written;
+  they do not design or implement it. Optional building agents have a separate
+  opt-in workflow; they do not change the review depth or escalation rules.
 - **Not a flightdeck server.** These agents have no access to AGENT_MESSAGE,
   COMPLETE_TASK, COMMIT, or any U+27E6/U+27E7 bracket commands. They are plain Copilot
   CLI custom agents. Don't try to send them flightdeck commands.

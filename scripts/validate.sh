@@ -77,6 +77,12 @@ else
   fail "reviewer count unit tests"
   printf '%s\n' "$reviewer_count_test_output"
 fi
+if extras_test_output="$(python3 scripts/_test_manage_extras.py 2>&1)"; then
+  pass "optional extras unit and install/uninstall integration tests"
+else
+  fail "optional extras tests"
+  printf '%s\n' "$extras_test_output"
+fi
 
 # --- C3: team table roster matches agent files ---
 # Model IDs are single-source in each agent's frontmatter; there is no model

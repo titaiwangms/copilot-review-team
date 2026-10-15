@@ -71,6 +71,13 @@ anything.
   Reviewer-count checks validate reviewer prompts against the primary role count,
   with regression coverage for forks that change the team or add alternate prompts.
 
+- **Keep extras opt-in.** Building/thinking agents belong in `extras/agents/`,
+  with matching roster entries in `extras/instructions/`. Instruction filenames
+  must use `copilot-review-team-<name>.instructions.md`. Default installs must
+  continue to deploy only the review team. Changes to optional deployment must
+  pass the isolated install/upgrade/uninstall tests; never test against your real
+  Copilot home.
+
 - **Don't commit anything private.** No internal repo names, secrets, tokens, or
   org-specific conventions in the shared files.
 
