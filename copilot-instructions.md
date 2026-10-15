@@ -57,39 +57,31 @@ not grow a routine review into a whole-repository investigation.
 The full team is **five reviewers + a QA tester**. It is an escalation path, not
 the default tax on every completed change.
 
-### Model backups
+### Model selection
 
-| Explicit-selection variant | Primary role | Role |
-|---|---|---|
-| `local-critical-reviewer-sol` | `local-critical-reviewer` | GPT-6.1 Sol compatibility variant for the Critical Reviewer |
-| `local-qa-tester-sol` | `local-qa-tester` | GPT-6.1 Sol compatibility variant for the QA Tester |
-| `local-deep-reviewer-sonnet` | `local-deep-reviewer` | Claude Sonnet 5.5 compatibility variant for the Deep Reviewer |
-
-This repository ships explicit-selection variants only for the roles in this
-table. Do not invent other variant names or silently omit a blocked role.
+There are no automatic model fallbacks or duplicate model variants.
+Do not invent backup agent names or silently omit a blocked role.
 
 Always dispatch the primary agent names `local-critical-reviewer`,
 `local-qa-tester`, and `local-deep-reviewer` without per-call model overrides.
-Their frontmatter declares ordered `models:` candidates: Astra then Sol for
-Critical/QA, Opus then Sonnet for Deep. Copilot CLI selects the first available
-model without changing the agent name. Their `modelPolicy: required` prevents
-silently inheriting an unlisted session model. If neither candidate is available,
+Their frontmatter declares one fixed `models:` entry: GPT-6.1 Sol for
+Critical/QA and Claude Sonnet 5.5 for Deep. Their `modelPolicy: required` prevents
+silently inheriting an unlisted session model. If the authored model is unavailable,
 report the role as blocked; do not silently omit it or pick another model.
 Do not claim a particular candidate ran without runtime evidence.
 
-The separately named backups are retained for explicit selection and
-compatibility, not the normal fallback path. Run only one agent per role in a
-phase. Model selection fallback does not retry timeouts, malformed reports, or
+Run only one agent per role in a
+phase. Do not switch models for timeouts, malformed reports, or
 repository test failures; those follow the sub-agent failure policy. An
 unavailable-model attempt is not a completed review round and does not reset
-the two-round cap. The Sol Critical Reviewer may
+the two-round cap. The Critical Reviewer may
 share the developer's model and the Code Reviewer's model, so retain the
-independent Claude and Grok review lenses. Both QA variants follow the same
+independent Claude and Grok review lenses. QA follows the same
 execution limits and exact-scenario evidence contract.
 
-The Sonnet Deep Reviewer preserves the Claude family and the same authority,
-boundary-input, and evidence requirements, not a claim of Opus-equivalent
-capability. It may share the Readability Reviewer's model. Unresolved proofs or
+The Deep Reviewer uses Claude Sonnet 5.5, sharing the Readability Reviewer's
+model while retaining its authority, boundary-input, and evidence requirements.
+Unresolved proofs or
 spec disputes remain attributed, non-blocking open questions; never turn an
 unresolved dispute into an unsupported approval just because the review ran.
 
@@ -151,9 +143,9 @@ begins only after the author or user supplies a revised diff.
    - `local-deep-reviewer`
    - `local-integration-reviewer`
 
-   Apply [Model backups](#model-backups): use the primary agent names without
-   per-call model overrides; their ordered candidate lists handle availability
-   without adding review roles.
+   Apply [Model selection](#model-selection): use the primary agent names without
+   per-call model overrides; report a role as blocked if its fixed model is
+   unavailable, without adding review roles.
 
    **Pass the diff inline in each prompt** (`git diff` output, or a summary of changed
    files with line numbers). Don't make each reviewer fetch it independently — that
@@ -171,7 +163,7 @@ begins only after the author or user supplies a revised diff.
 6. **Add `local-qa-tester` only when running the code is warranted** — when behavior,
    not just static structure, is in question and the change is runnable in this
    workspace. Use `local-qa-tester` without a per-call model override so its
-   candidate list handles Astra availability; this does not change whether QA
+   required frontmatter uses GPT-6.1 Sol; this does not change whether QA
    is warranted. **Review-only ≠ run the code:** unless the user asks you to execute the
    code (or behavior is genuinely in doubt), keep the pass static and leave the
    qa-tester out. Start with the smallest relevant existing target, require explicit
@@ -264,9 +256,8 @@ rather than forwarding it.
 
 If a sub-agent fails (errors out, returns garbage, refuses, or times out):
 
-For an Astra or Opus model-unavailable failure, the primary agent's authored
-candidate list is the fallback mechanism. If dispatch cannot resolve either
-candidate, report the role as blocked rather than retrying the same unavailable
+For a required fixed-model-unavailable failure,
+report the role as blocked rather than retrying the same unavailable
 model or bypassing `modelPolicy: required`. Do not treat a timeout,
 malformed report, or repository test failure as proof of model unavailability.
 For other failures:
@@ -304,27 +295,22 @@ review is fast and supplies two distinct model-family perspectives. The full
 team is intentionally split across model families so deep escalation does not
 share one model's blind spots:
 
-- Code Reviewer + Critical Reviewer are **GPT** specialists; the Critical Reviewer
-  normally uses a different model from the default GPT-6.1 Sol developer (the Sol
-  backup does not), while Claude and Grok reviewers provide cross-family
+- Code Reviewer + Critical Reviewer use **GPT-6.1 Sol**, potentially sharing
+  the developer's model, while Claude and Grok reviewers provide cross-family
   counterweights
 - Readability Reviewer is **Claude sonnet** (clarity is a fresh-reader lens, not
   adversarial)
-- Deep Reviewer is **Claude Opus 5.5** (strong base model for spec adherence, math, and
+- Deep Reviewer is **Claude Sonnet 5.5** (authority-grounded spec adherence, math, and
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
-  math/spec claim). Its second native candidate is Claude Sonnet 5.5,
-  preserving the role but sharing the Readability Reviewer's model and not
-  guaranteeing equivalent capability. The separately named
-  `local-deep-reviewer-sonnet` is an explicit-selection compatibility variant.
+  math/spec claim). It shares the Readability Reviewer's model while preserving
+  distinct evidence requirements.
 - Integration Reviewer is **Grok 4.7** (third model family — a fresh blind-spot
   set neither Claude nor GPT shares; its large context window fits bounded
   cross-module producer/consumer tracing)
-- QA Tester is **GPT-6 Astra** (it runs the code, authors repros, brings up cold/
+- QA Tester is **GPT-6.1 Sol** (it runs the code, authors repros, brings up cold/
   misconfigured builds, and drives sanitizers/benchmarks — a long-horizon,
   agentic-reasoning-heavy instrument role. Family diversity isn't the point here;
-  tool-use strength is, so it prefers the strongest agentic model). Its second
-  native candidate is GPT-6.1 Sol; `local-qa-tester-sol` is an explicit-selection
-  compatibility variant.
+  tool-use reliability is).
 
 If you change a model, preserve independent family counterweights among the
 judgment-producing reviewers; no single family should dominate every review lens

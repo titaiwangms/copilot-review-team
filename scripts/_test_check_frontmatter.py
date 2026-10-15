@@ -14,7 +14,7 @@ from _check_frontmatter import check_frontmatter
 GOOD = """---
 name: local-code-reviewer
 description: reviews function-level correctness
-model: claude-opus-4.8
+model: claude-sonnet-5.5
 tools:
   - read
   - search
@@ -61,12 +61,12 @@ class CheckFrontmatterTest(unittest.TestCase):
 
     def test_ordered_models_with_required_policy_passes(self):
         text = _with_model(
-            "models:\n  - gpt-6-astra\n  - gpt-6.1-sol\nmodelPolicy: required"
+            "models:\n  - gpt-6.1-sol\n  - claude-sonnet-5.5\nmodelPolicy: required"
         )
         self.assertEqual(check_frontmatter(text, "local-code-reviewer"), [])
 
     def test_models_and_legacy_model_passes(self):
-        text = _with_model("model: gpt-6-astra\nmodels:\n  - gpt-6.1-sol")
+        text = _with_model("model: claude-sonnet-5.5\nmodels:\n  - gpt-6.1-sol")
         self.assertEqual(check_frontmatter(text, "local-code-reviewer"), [])
 
     def test_empty_models_rejected(self):
@@ -76,21 +76,21 @@ class CheckFrontmatterTest(unittest.TestCase):
     def test_malformed_models_rejected(self):
         for value in (
             "models: gpt-6.1-sol",
-            "models: [gpt-6-astra, gpt-6.1-sol]",
+            "models: [claude-sonnet-5.5, gpt-6.1-sol]",
             "models: |\n  gpt-6.1-sol",
             "models:\n  - gpt 6",
             "models:\n  -",
             "models:\n  - gpt-6.1-sol\n  invalid",
             "models:\n  - gpt-6.1-sol\n  nested: value",
-            "models:\n  - gpt-6-astra:",
-            "models:\n\t- gpt-6-astra",
+            "models:\n  - gpt-6.1-sol:",
+            "models:\n\t- gpt-6.1-sol",
         ):
             with self.subTest(value=value):
                 errors = check_frontmatter(_with_model(value), "local-code-reviewer")
                 self.assertTrue(any("malformed" in e for e in errors), errors)
 
     def test_inconsistent_models_indentation_rejected(self):
-        text = _with_model("models:\n  - gpt-6-astra\n    - gpt-6.1-sol")
+        text = _with_model("models:\n  - claude-sonnet-5.5\n    - gpt-6.1-sol")
         errors = check_frontmatter(text, "local-code-reviewer")
         self.assertTrue(any("indentation" in e for e in errors), errors)
 
@@ -101,15 +101,15 @@ class CheckFrontmatterTest(unittest.TestCase):
     def test_duplicate_models_rejected(self):
         for second in ("models:", "models:\n  - gpt-6.1-sol"):
             with self.subTest(second=second):
-                text = _with_model("models:\n  - gpt-6-astra\n" + second)
+                text = _with_model("models:\n  - claude-sonnet-5.5\n" + second)
                 errors = check_frontmatter(text, "local-code-reviewer")
                 self.assertTrue(any("duplicate models" in e for e in errors), errors)
 
-    def test_shipped_native_fallback_contract(self):
+    def test_shipped_fixed_model_contract(self):
         agents = {
-            "local-critical-reviewer": ("gpt-6-astra", "gpt-6.1-sol"),
-            "local-qa-tester": ("gpt-6-astra", "gpt-6.1-sol"),
-            "local-deep-reviewer": ("claude-opus-5.5", "claude-sonnet-5.5"),
+            "local-critical-reviewer": ("gpt-6.1-sol",),
+            "local-qa-tester": ("gpt-6.1-sol",),
+            "local-deep-reviewer": ("claude-sonnet-5.5",),
         }
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         for name, candidates in agents.items():
@@ -117,12 +117,13 @@ class CheckFrontmatterTest(unittest.TestCase):
                 with open(os.path.join(root, "agents", name + ".agent.md"), encoding="utf-8") as file:
                     text = file.read()
                 self.assertEqual(check_frontmatter(text, name), [])
-                expected = "models:\n  - %s\n  - %s\nmodelPolicy: required\n" % candidates
+                expected = "models:\n" + "".join("  - %s\n" % model for model in candidates)
+                expected += "modelPolicy: required\n"
                 self.assertIn(expected, text.split("---", 2)[1])
 
     def test_models_comments_and_blanks_pass(self):
         text = _with_model(
-            "models:\n  # primary\n  - gpt-6-astra\n\n  - gpt-6.1-sol"
+            "models:\n  # primary\n  - claude-sonnet-5.5\n\n  - gpt-6.1-sol"
         )
         self.assertEqual(check_frontmatter(text, "local-code-reviewer"), [])
 

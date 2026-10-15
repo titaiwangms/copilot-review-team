@@ -1,8 +1,7 @@
 ---
 name: local-critical-reviewer
-description: "Critical Reviewer: adversarial review for bugs, security, performance, edge cases, and structural design flaws. Prefers Astra with native Sol fallback."
+description: "Critical Reviewer: adversarial review for bugs, security, performance, edge cases, and structural design flaws. Uses GPT-6.1 Sol."
 models:
-  - gpt-6-astra
   - gpt-6.1-sol
 modelPolicy: required
 tools:
