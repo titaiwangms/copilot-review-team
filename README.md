@@ -89,17 +89,30 @@ model-diversity trade-off.
 
 ### Model selection
 
-The Critical Reviewer and QA Tester declare `models: [gpt-6.1-sol]`
-(written as block lists); the Deep Reviewer declares
-`models: [claude-sonnet-5.5]`. Each primary uses a fixed model, with no automatic
-model fallback. Do not invent backup agent names or silently omit a blocked role.
+The Critical Reviewer and QA Tester declare `model: gpt-6.1-sol`;
+the Deep Reviewer declares `model: claude-sonnet-5.5`. Each primary declares
+one model, with no authored fallback list. Do not invent backup agent names
+or silently omit a blocked role.
 
-These three primary agents retain `modelPolicy: required`: use the authored
-fixed model, not an unlisted session model or a per-call override.
-Use the primary agent name and omit per-call model overrides. If its model
-is unavailable, report the role as blocked. Timeouts, malformed reports, and
-test failures are not reasons to switch models. Report actual execution only
-when runtime evidence is available.
+These three primary agents retain `modelPolicy: required` to request fixed-model
+enforcement. Use the primary agent name and omit per-call model overrides.
+This is configuration, not proof of execution: before crediting any review role
+or model-family diversity, verify its actual model from runtime metadata.
+If unavailable, mismatched or unverified, report the role blocked/incomplete
+and do not count its result toward required coverage or semantic tie-breaking.
+Timeouts, malformed reports and test failures are not reasons to switch models.
+
+Use actual selected-model fields in CLI task/session metadata, such as `model`
+on `subagent.started` / `subagent.completed` events. An agent's own model claim,
+its description and its authored configuration do not count as evidence.
+If that metadata is unavailable, report the role unverified.
+
+A local CLI 1.0.98 invocation of Deep inherited the session's GPT model despite
+its Sonnet `models:` / required-policy declaration. The primary definitions now
+use scalar `model:` fields, as the other roles already did, while retaining the
+policy. A fresh-session runtime check is still required after installation;
+the parser cause has not been established and static validation cannot prove
+that the CLI honors the policy.
 
 Run only one agent per role in each phase.
 
@@ -161,7 +174,8 @@ After code is written, or when you ask the lead to
 4. **Full fan-out when needed** — all five full reviewers run in parallel. The QA
    tester joins only when runtime evidence is warranted. Keep the primary agent
    names and omit per-call model overrides; the required fixed model must be
-   available; otherwise report the role as blocked.
+   available and its actual selection verified; otherwise report the role
+   blocked/incomplete.
 5. **Common evidence contract** — each full reviewer reports severity, location,
    claim, evidence, impact, minimal fix, and confidence. Deep review adds the
    governing authority; Integration adds both sides of the affected contract.
@@ -233,10 +247,12 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
 
 ## Prerequisites
 
-- **GitHub Copilot CLI** with agent `models` and `modelPolicy` support installed
-  and working (verified in version 1.0.95) — see
+- **GitHub Copilot CLI** with agent `model` and `modelPolicy` support installed
+  and working — see
   [github/copilot-cli](https://github.com/github/copilot-cli)
   (typically `npm install -g @github/copilot`, then run `copilot`).
+  Verify actual model selection in your installed CLI; this repo's self-checks
+  validate configuration and deployment, not runtime enforcement.
 - A Copilot plan whose account can access the configured model families (MAI /
   Claude / GPT / Grok). If yours can't, swap the model IDs (see
   [Customization](#customization)).
@@ -315,7 +331,8 @@ git pull --ff-only
 ./install.sh
 ```
 
-Restart Copilot after installation. Keep shared definitions in this repo and
+Restart Copilot after installation and verify actual review-role models before
+counting the review complete. Keep shared definitions in this repo and
 re-run the installer rather than editing the deployed copies independently.
 `./install.sh --help` lists the optional install switches.
 
@@ -374,21 +391,23 @@ For an optional agent, edit its file under `extras/agents/` and use
 use plain `./install.sh`.
 
 The three primary roles use fixed Sol/Sonnet models, without automatic fallback.
-To retarget them, edit the `models:` block list and keep
-`modelPolicy: required` to prevent unlisted-model substitution. The repository
-validator accepts one or more bare model IDs in block lists, not inline YAML lists.
+To retarget them, edit the scalar `model:` field and keep
+`modelPolicy: required` to request enforcement. Check the actual selected model
+after reinstalling; a successful response alone does not establish compliance.
+The validator also accepts `models:` block lists for custom definitions, but that
+is a syntax check, not a dispatch test.
 
 For example, the Critical Reviewer and QA Tester use:
 
 ```yaml
-models:
-  - gpt-6.1-sol
+model: gpt-6.1-sol
 modelPolicy: required
 ```
 
-The Deep Reviewer uses only `claude-sonnet-5.5`, with the
-same required policy. If the configured model is inaccessible, dispatch is blocked
-rather than silently selecting the session model.
+The Deep Reviewer declares only `claude-sonnet-5.5`, with the same required
+policy. If the CLI rejects it, selects another model or provides no model
+evidence, the lead must report the role blocked/incomplete rather than
+claiming Sonnet review.
 
 For other unavailable models, point the affected
 agent at one your account can use. When swapping, preserve independent family counterweights among the

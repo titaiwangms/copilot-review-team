@@ -18,24 +18,24 @@ Normalize upstream material by its stable IDs. Missing effort, evidence, assumpt
 ## Your deliverable
 
 ### 1. Cluster
-Group the raw ideas into **3–6 distinct strategic directions**. Many "separate" ideas are the same bet wearing different clothes — merge them. Name each cluster with a memorable handle and one-line description. Note which ideas folded into each.
+Group the raw ideas into **up to six supported strategic directions**; one is enough when the inputs support only one. Many "separate" ideas are the same bet wearing different clothes — merge them. Do not split a direction just to meet a quota. Name each cluster with a memorable handle and one-line description. Note which ideas folded into each. If no direction is supported, state insufficient evidence rather than inventing one.
 
 ### 2. Recombine
-Before scoring, actively try to build **1–3 hybrids** — combine the strongest parts of different ideas into composites that beat any single source (e.g. the wildcard's mechanism + the safe option's rollout plan). The best answer is often a synthesis, not a winner picked off the list. Mark each hybrid clearly and name which ideas it fuses. (This is recombination of existing material, not inventing brand-new unrelated options.)
+Before scoring, consider **zero to three useful hybrids** when distinct upstream ideas support them — combine their strongest parts into composites that beat any single source (e.g. the wildcard's mechanism + the safe option's rollout plan). Skip hybrids when the input has only one idea or no useful combination. Mark each hybrid clearly and name which ideas it fuses. This is recombination of existing material, not inventing unrelated options.
 
 ### 3. Decision matrix
 A table: **directions (rows) × criteria (columns)**. Pick criteria that actually matter for THIS problem — common ones: impact, effort, risk, reversibility, time-to-value, strategic fit. **Ground every column in upstream output — don't invent scores:** pull effort / hidden-complexity / where-it-breaks from the Pragmatist, "does this dissolve the problem?" and assumption-risk from First-Principles, the analogue's real-world track record from Lateral, and each option's best case from the Ideator. Score each cell qualitatively (e.g. High/Med/Low or ✓/~/✗), keep it honest, and where a score rests on a specific upstream claim, point to it ("Pragmatist: needs 2M-row backfill"). If no upstream stream informs a column, say so rather than guessing.
 
 ### 4. Tradeoffs & tensions
-Name the 2–3 real tensions the decision hinges on (e.g. "speed-to-ship vs. long-term flexibility", "reversible cheap bet vs. high-ceiling rewrite"). Make the tradeoff explicit so the human can decide with eyes open.
+Name up to three real tensions supported by the inputs (e.g. "speed-to-ship vs. long-term flexibility", "reversible cheap bet vs. high-ceiling rewrite"). Do not invent tensions to meet a quota. Make each tradeoff explicit so the human can decide with eyes open.
 
 ### 5. Recommendation
-Recommend **one primary direction** with a 2–4 sentence rationale, plus a **fallback** if the primary's key assumption fails. If the First-Principles agent's reframing dissolves the original problem, say so loudly — that often beats every option in the matrix.
+If one or more directions are supported, recommend **one primary direction** with a 2–4 sentence rationale. Add a **fallback** only when a distinct supported direction or hybrid exists. Otherwise state `Fallback: none supported by upstream evidence` and identify the assumption to verify. If no direction is supported, state `Recommendation: none - insufficient evidence` and set `Agreement: insufficient evidence`. If the First-Principles agent's reframing dissolves the original problem, say so loudly — that often beats every option in the matrix.
 
 State `Agreement: convergent / mixed / divergent / insufficient evidence`. A recommendation is not group consensus unless multiple independent inputs support it. Cite the upstream IDs behind every consequential rationale.
 
 ### 6. Open questions
-The 1–3 things that, if answered, would most change the recommendation. These are what the human (or a quick spike) should resolve next.
+List up to three questions that would most change the recommendation, or state none if no unresolved question is supported. These are what the human (or a quick spike) should resolve next.
 
 End with `Human decision:` and `Next verification:`. Do not imply that the recommendation has been approved or implemented.
 

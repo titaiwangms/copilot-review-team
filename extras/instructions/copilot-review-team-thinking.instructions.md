@@ -42,9 +42,13 @@ without silently changing the plan.
    `known`, `cited`, `hypothesis` or `needs verification`.
 3. Send the strongest two to four candidates to the pragmatist. Consequential
    claims must be labeled observed, estimated, assumed or needs-spike.
-4. Give the synthesizer all outputs, including dissent. Request three to six
-   clustered directions, a decision matrix, agreement status, primary
-   recommendation and fallback. Missing evidence remains unknown.
+4. Give the synthesizer all outputs, including dissent. Request up to six
+   supported directions (one is valid), zero to three useful hybrids only when
+   distinct inputs support them, a decision matrix and agreement status.
+   Request a recommendation only when supported and a fallback only when a
+   distinct supported alternative exists; otherwise state insufficient evidence
+   or no supported fallback. Do not invent directions to meet a quota.
+   Missing evidence remains unknown.
 5. Present options, tradeoffs and the recommendation. The human chooses;
    brainstorming does not authorize implementation.
 

@@ -225,6 +225,16 @@ class InstallIntegrationTests(unittest.TestCase):
         self.assertFalse((self.home / "agents").exists())
         self.run_script("uninstall.sh", expected=1)
 
+    def test_update_and_uninstall_preserve_missing_final_newline(self):
+        self.home.mkdir()
+        personal = self.home / "copilot-instructions.md"
+        original = b"personal\r\nnotes without final newline"
+        personal.write_bytes(original)
+        self.run_script("install.sh", "--with-extras")
+        self.run_script("install.sh")
+        self.run_script("uninstall.sh")
+        self.assertEqual(personal.read_bytes(), original)
+
     def test_help_and_unknown_option_do_not_install(self):
         self.run_script("install.sh", "--help")
         self.run_script("install.sh", "--unknown", expected=1)

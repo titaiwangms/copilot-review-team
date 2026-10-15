@@ -173,6 +173,62 @@ class MergePlaybookTest(unittest.TestCase):
         mp.cmd_remove(self.target)
         self.assertEqual(self.read_target_bytes(), original)
 
+    def test_missing_final_newline_round_trip_and_upgrade(self):
+        for original in (
+            b"personal notes",
+            b"first\nlast",
+            b"first\r\nlast",
+            b"first\r\nsecond\nlast",
+            b"notes  ",
+            b"notes\r",
+            b"first\r\nnotes\r",
+        ):
+            with self.subTest(original=original):
+                self.write_target_bytes(original)
+                self.assertEqual(mp.cmd_install(self.target, self.source), 0)
+                installed = self.read_target_bytes()
+                self.assertIn(mp.NO_FINAL_NEWLINE.encode("utf-8"), installed)
+                self.assertEqual(mp.cmd_install(self.target, self.source), 0)
+                self.assertEqual(self.read_target_bytes(), installed)
+                self.assertEqual(mp.cmd_remove(self.target), 0)
+                self.assertEqual(self.read_target_bytes(), original)
+
+    def test_mixed_line_endings_round_trip(self):
+        original = b"first\r\nsecond\nthird\r\n"
+        self.write_target_bytes(original)
+        mp.cmd_install(self.target, self.source)
+        mp.cmd_remove(self.target)
+        self.assertEqual(self.read_target_bytes(), original)
+
+    def test_non_newline_separators_do_not_create_marker_lines(self):
+        original = ("notes\v" + mp.BEGIN + "\fstill personal").encode("utf-8")
+        self.write_target_bytes(original)
+        mp.cmd_install(self.target, self.source)
+        mp.cmd_remove(self.target)
+        self.assertEqual(self.read_target_bytes(), original)
+
+    def test_remove_missing_newline_metadata_preserves_appended_user_content(self):
+        self.write_target_bytes(b"personal notes")
+        mp.cmd_install(self.target, self.source)
+        self.write_target_bytes(self.read_target_bytes() + b"new personal content\n")
+        mp.cmd_remove(self.target)
+        self.assertEqual(self.read_target_bytes(), b"personal notesnew personal content\n")
+
+    def test_invalid_missing_newline_metadata_aborts_without_writing(self):
+        for original in (
+            mp.BEGIN + "\n" + mp.NO_FINAL_NEWLINE + "\n" + mp.END + "\n",
+            "user\n\n" + mp.BEGIN + "\ncontent\n" + mp.NO_FINAL_NEWLINE + "\n" + mp.END + "\n",
+            "user\n\n" + mp.BEGIN + "\r\n" + mp.NO_FINAL_NEWLINE + "\r\n" + mp.END + "\r\n",
+        ):
+            with self.subTest(original=original):
+                self.write_target_bytes(original.encode("utf-8"))
+                for command in (
+                    ["_merge_playbook.py", "remove", self.target],
+                    ["_merge_playbook.py", "install", self.target, self.source],
+                ):
+                    self.assertEqual(mp.main(command), 1)
+                    self.assertEqual(self.read_target_bytes(), original.encode("utf-8"))
+
     def test_install_preserves_existing_file_permissions(self):
         # _atomic_write's temp-file-then-replace must not silently widen (or
         # narrow) an existing target's mode to whatever the process umask
@@ -202,6 +258,13 @@ class MergePlaybookTest(unittest.TestCase):
         rc = mp.cmd_install(self.target, bad_source)
         self.assertEqual(rc, 1)
         # Target must be untouched (no managed block written).
+        self.assertEqual(self.read_target(), "user content\n")
+
+    def test_install_rejects_metadata_in_source(self):
+        self.write_target("user content\n")
+        with open(self.source, "w", encoding="utf-8") as file:
+            file.write(mp.NO_FINAL_NEWLINE + "\n")
+        self.assertEqual(mp.cmd_install(self.target, self.source), 1)
         self.assertEqual(self.read_target(), "user content\n")
 
 

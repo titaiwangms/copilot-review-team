@@ -107,19 +107,19 @@ class CheckFrontmatterTest(unittest.TestCase):
 
     def test_shipped_fixed_model_contract(self):
         agents = {
-            "local-critical-reviewer": ("gpt-6.1-sol",),
-            "local-qa-tester": ("gpt-6.1-sol",),
-            "local-deep-reviewer": ("claude-sonnet-5.5",),
+            "local-critical-reviewer": "gpt-6.1-sol",
+            "local-qa-tester": "gpt-6.1-sol",
+            "local-deep-reviewer": "claude-sonnet-5.5",
         }
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        for name, candidates in agents.items():
+        for name, model in agents.items():
             with self.subTest(agent=name):
                 with open(os.path.join(root, "agents", name + ".agent.md"), encoding="utf-8") as file:
                     text = file.read()
                 self.assertEqual(check_frontmatter(text, name), [])
-                expected = "models:\n" + "".join("  - %s\n" % model for model in candidates)
-                expected += "modelPolicy: required\n"
-                self.assertIn(expected, text.split("---", 2)[1])
+                frontmatter = text.split("---", 2)[1]
+                self.assertIn("model: %s\nmodelPolicy: required\n" % model, frontmatter)
+                self.assertNotIn("models:", frontmatter)
 
     def test_models_comments_and_blanks_pass(self):
         text = _with_model(
