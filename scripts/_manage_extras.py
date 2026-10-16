@@ -115,12 +115,24 @@ def manage(action, home, backup, source=SOURCE):
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(target, destination, follow_symlinks=False)
 
+    manifest = home / MANIFEST
+    owned = previous.copy()
+
+    def record_ownership(names):
+        atomic_write(manifest, ("\n".join(sorted(names)) + "\n").encode("utf-8"), 0o600)
+
     for name, path in sorted(files.items()):
         target = home / name
         data = path.read_bytes()
-        if not target.is_symlink() and target.is_file() and target.read_bytes() == data:
+        unchanged = not target.is_symlink() and target.is_file() and target.read_bytes() == data
+        if not unchanged:
+            save(target, name)
+        # Record ownership before deployment so a failed install remains removable.
+        if name not in owned:
+            record_ownership(owned | {name})
+            owned.add(name)
+        if unchanged:
             continue
-        save(target, name)
         atomic_write(target, data, path.stat().st_mode & 0o777)
         print("  extras: install %s" % name)
     for name in sorted(previous - files.keys()):
@@ -129,9 +141,8 @@ def manage(action, home, backup, source=SOURCE):
             save(target, name)
             target.unlink()
             print("  extras: remove %s" % name)
-    manifest = home / MANIFEST
     if installing:
-        atomic_write(manifest, ("\n".join(sorted(files)) + "\n").encode("utf-8"), 0o600)
+        record_ownership(files)
         print("  extras: enabled (future installs keep this opt-in)")
     elif manifest.exists():
         manifest.unlink()

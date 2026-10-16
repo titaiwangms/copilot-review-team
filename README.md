@@ -318,6 +318,10 @@ This removes only extras recorded in their manifest and clears the opt-in.
 Replaced and removed extras are backed up in `.backup-<timestamp>-<pid>/`;
 unrelated agents and instructions are not removed. An existing same-named file
 is backed up before replacement, not automatically restored on uninstall.
+Ownership is recorded before each newly managed file is deployed. If installation
+fails, already deployed extras remain tracked and can be removed with
+`./install.sh --without-extras` or `./uninstall.sh` after the write failure is
+corrected. A failed update keeps prior ownership entries until finalization.
 `./uninstall.sh` removes both the review team and any installed extras;
 `./uninstall.sh --dry-run` changes nothing.
 

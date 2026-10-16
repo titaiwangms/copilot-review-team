@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Stdlib-only tests; all deployment writes stay inside temporary directories."""
 import contextlib
+import errno
 import io
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _manage_extras as extras
@@ -63,6 +65,104 @@ class ExtrasTests(unittest.TestCase):
         backup = self.run_action("install")
         self.assertEqual((backup / AGENT).read_text(), "old agent")
         self.assertEqual((backup / INSTRUCTION).read_text(), "old instruction")
+
+    def test_first_ownership_write_failure_does_not_deploy_files(self):
+        write = extras.atomic_write
+
+        def fail_manifest(target, data, mode):
+            if target == self.home / extras.MANIFEST:
+                raise OSError(errno.ENOSPC, "injected manifest write failure")
+            write(target, data, mode)
+
+        with mock.patch.object(extras, "atomic_write", side_effect=fail_manifest):
+            with self.assertRaises(OSError):
+                self.run_action("install")
+        self.assertFalse((self.home / AGENT).exists())
+        self.assertFalse((self.home / INSTRUCTION).exists())
+        self.assertFalse((self.home / extras.MANIFEST).exists())
+
+    def test_final_manifest_write_failure_keeps_deployed_files_removable(self):
+        write = extras.atomic_write
+
+        def fail_final_manifest(target, data, mode):
+            if target == self.home / extras.MANIFEST and (self.home / INSTRUCTION).exists():
+                raise OSError(errno.ENOSPC, "injected final manifest write failure")
+            write(target, data, mode)
+
+        with mock.patch.object(extras, "atomic_write", side_effect=fail_final_manifest):
+            with self.assertRaises(OSError):
+                self.run_action("install")
+        self.assertEqual(extras.read_manifest(self.home), {AGENT, INSTRUCTION})
+        self.assertEqual((self.home / AGENT).read_text(), "agent\n")
+        self.assertEqual((self.home / INSTRUCTION).read_text(), "instructions\n")
+        self.run_action("remove")
+        self.assertFalse((self.home / AGENT).exists())
+        self.assertFalse((self.home / INSTRUCTION).exists())
+        self.assertFalse((self.home / extras.MANIFEST).exists())
+
+    def test_deployment_failure_leaves_partial_install_recorded(self):
+        write = extras.atomic_write
+
+        def fail_instruction(target, data, mode):
+            if target == self.home / INSTRUCTION:
+                raise OSError(errno.ENOSPC, "injected deployment failure")
+            write(target, data, mode)
+
+        with mock.patch.object(extras, "atomic_write", side_effect=fail_instruction):
+            with self.assertRaises(OSError):
+                self.run_action("install")
+        self.assertTrue((self.home / AGENT).exists())
+        self.assertFalse((self.home / INSTRUCTION).exists())
+        self.assertEqual(extras.read_manifest(self.home), {AGENT, INSTRUCTION})
+        self.run_action("remove")
+        self.assertFalse((self.home / AGENT).exists())
+        self.assertFalse((self.home / extras.MANIFEST).exists())
+
+    def test_upgrade_ownership_failure_preserves_unclaimed_personal_file(self):
+        self.run_action("install")
+        self.write(self.source / AGENT, "updated\n")
+        added = "agents/local-new.agent.md"
+        self.write(self.source / added, "new\n")
+        self.write(self.home / added, "personal\n")
+        write = extras.atomic_write
+
+        def fail_manifest(target, data, mode):
+            if target == self.home / extras.MANIFEST:
+                raise OSError(errno.ENOSPC, "injected ownership write failure")
+            write(target, data, mode)
+
+        with mock.patch.object(extras, "atomic_write", side_effect=fail_manifest):
+            with self.assertRaises(OSError):
+                self.run_action("install")
+        self.assertEqual((self.home / AGENT).read_text(), "updated\n")
+        self.assertEqual(extras.read_manifest(self.home), {AGENT, INSTRUCTION})
+        self.assertEqual((self.home / added).read_text(), "personal\n")
+        self.assertEqual((self.home / ".backup-test-2" / added).read_text(), "personal\n")
+        self.run_action("remove")
+        self.assertEqual((self.home / added).read_text(), "personal\n")
+
+    def test_failed_upgrade_finalization_keeps_union_until_cleanup(self):
+        self.run_action("install")
+        (self.source / INSTRUCTION).unlink()
+        added = "agents/local-new.agent.md"
+        self.write(self.source / added, "new\n")
+        write = extras.atomic_write
+
+        def fail_final_manifest(target, data, mode):
+            if target == self.home / extras.MANIFEST and not (self.home / INSTRUCTION).exists():
+                raise OSError(errno.ENOSPC, "injected final manifest write failure")
+            write(target, data, mode)
+
+        with mock.patch.object(extras, "atomic_write", side_effect=fail_final_manifest):
+            with self.assertRaises(OSError):
+                self.run_action("install")
+        self.assertEqual(extras.read_manifest(self.home), {AGENT, INSTRUCTION, added})
+        self.assertTrue((self.home / added).exists())
+        self.assertFalse((self.home / INSTRUCTION).exists())
+        self.run_action("remove")
+        self.assertFalse((self.home / AGENT).exists())
+        self.assertFalse((self.home / added).exists())
+        self.assertFalse((self.home / extras.MANIFEST).exists())
 
     def test_upgrade_prunes_only_recorded_files(self):
         self.run_action("install")
@@ -201,6 +301,32 @@ class InstallIntegrationTests(unittest.TestCase):
         self.assertFalse((self.home / "agents/local-openai-developer.agent.md").exists())
         self.run_script("install.sh")
         self.assertFalse((self.home / extras.MANIFEST).exists())
+
+    def test_shell_cleanup_after_failed_extras_manifest_finalization(self):
+        self.home.mkdir()
+        files = extras.source_files(ROOT / "extras")
+        personal = self.home / "instructions/personal.instructions.md"
+        personal.parent.mkdir()
+        personal.write_text("personal\n", encoding="utf-8")
+        write = extras.atomic_write
+
+        def fail_final_manifest(target, data, mode):
+            if target == self.home / extras.MANIFEST and all(
+                (self.home / name).exists() for name in files
+            ):
+                raise OSError(errno.ENOSPC, "injected final manifest write failure")
+            write(target, data, mode)
+
+        for index, command in enumerate((("install.sh", "--without-extras"), ("uninstall.sh",))):
+            with self.subTest(command=command):
+                with mock.patch.object(extras, "atomic_write", side_effect=fail_final_manifest):
+                    with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(OSError):
+                        extras.manage("install", self.home, self.home / (".backup-failed-%s" % index))
+                self.assertEqual(extras.read_manifest(self.home), set(files))
+                self.run_script(*command)
+                self.assertFalse((self.home / extras.MANIFEST).exists())
+                self.assertTrue(all(not (self.home / name).exists() for name in files))
+                self.assertEqual(personal.read_text(), "personal\n")
 
     def test_full_uninstall_and_dry_run_preserve_personal_content(self):
         self.home.mkdir()
