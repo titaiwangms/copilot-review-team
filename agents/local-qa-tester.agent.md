@@ -1,8 +1,7 @@
 ---
 name: local-qa-tester
 description: "QA Tester: runs code end-to-end, verifies behavior, and catches runtime failures. Uses GPT-6.1 Sol."
-models:
-  - gpt-6.1-sol
+model: gpt-6.1-sol
 modelPolicy: required
 tools:
   - read

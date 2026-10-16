@@ -8,6 +8,11 @@ diff, or a set of changed files and it defaults to a fast two-agent lightweight
 review. Risky or escalated changes fan out to five specialized reviewers and a
 QA tester spread across three model families.
 
+The review team remains the default installation. Optional building and thinking
+agents, with their workflow instructions, are available via `./install.sh --with-extras`
+for sharing a broader agent toolkit across machines. No CLI settings, credentials,
+sessions or logs are synced.
+
 The playbook provides two deliberately separate paths:
 
 - **Lightweight team:** MAI-Code-1.1-Flash checks implementation correctness while
@@ -75,24 +80,39 @@ are read from those files.
 | `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `grok-4.7` | Third model family + large context window for producer/consumer analysis |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6.1-sol` | GPT-6.1 Sol provides the execution instrument |
 
-The repository ships eight agents: two lightweight reviewers, five full
-reviewers, and one optional QA tester. There are no duplicate model variants.
+The default installation ships eight agents: two lightweight reviewers, five full
+reviewers, and one optional QA tester. Ten additional building/thinking agents
+are opt-in; the Claude/OpenAI building pairs are explicit alternatives, not
+automatic model fallbacks.
 See [Model selection](#model-selection) for failure handling and the
 model-diversity trade-off.
 
 ### Model selection
 
-The Critical Reviewer and QA Tester declare `models: [gpt-6.1-sol]`
-(written as block lists); the Deep Reviewer declares
-`models: [claude-sonnet-5.5]`. Each primary uses a fixed model, with no automatic
-model fallback. Do not invent backup agent names or silently omit a blocked role.
+The Critical Reviewer and QA Tester declare `model: gpt-6.1-sol`;
+the Deep Reviewer declares `model: claude-sonnet-5.5`. Each primary declares
+one model, with no authored fallback list. Do not invent backup agent names
+or silently omit a blocked role.
 
-These three primary agents retain `modelPolicy: required`: use the authored
-fixed model, not an unlisted session model or a per-call override.
-Use the primary agent name and omit per-call model overrides. If its model
-is unavailable, report the role as blocked. Timeouts, malformed reports, and
-test failures are not reasons to switch models. Report actual execution only
-when runtime evidence is available.
+These three primary agents retain `modelPolicy: required` to request fixed-model
+enforcement. Use the primary agent name and omit per-call model overrides.
+This is configuration, not proof of execution: before crediting any review role
+or model-family diversity, verify its actual model from runtime metadata.
+If unavailable, mismatched or unverified, report the role blocked/incomplete
+and do not count its result toward required coverage or semantic tie-breaking.
+Timeouts, malformed reports and test failures are not reasons to switch models.
+
+Use actual selected-model fields in CLI task/session metadata, such as `model`
+on `subagent.started` / `subagent.completed` events. An agent's own model claim,
+its description and its authored configuration do not count as evidence.
+If that metadata is unavailable, report the role unverified.
+
+A local CLI 1.0.98 invocation of Deep inherited the session's GPT model despite
+its Sonnet `models:` / required-policy declaration. The primary definitions now
+use scalar `model:` fields, as the other roles already did, while retaining the
+policy. A fresh-session runtime check is still required after installation;
+the parser cause has not been established and static validation cannot prove
+that the CLI honors the policy.
 
 Run only one agent per role in each phase.
 
@@ -122,9 +142,11 @@ agents/                       8 sub-agent definitions
   local-deep-reviewer.agent.md         Spec/math arbiter: multi-file invariants, tie-breaker
   local-integration-reviewer.agent.md  Bounded cross-module contract tracing
   local-qa-tester.agent.md             Actually runs the code, reports repro steps
+extras/agents/                10 optional building/thinking agents
+extras/instructions/          Optional building and thinking workflows
 copilot-instructions.md       The orchestration playbook (the part that ties it together)
-install.sh                    Copies agents + merges the playbook into ~/.copilot/
-uninstall.sh                  Removes this repo's agents (leaves others alone)
+install.sh                    Installs review agents/playbook + opt-in extras
+uninstall.sh                  Removes the review team and any installed extras
 scripts/validate.sh           Repo self-checks (run before submitting a PR; also runs in CI)
 ```
 
@@ -152,7 +174,8 @@ After code is written, or when you ask the lead to
 4. **Full fan-out when needed** — all five full reviewers run in parallel. The QA
    tester joins only when runtime evidence is warranted. Keep the primary agent
    names and omit per-call model overrides; the required fixed model must be
-   available; otherwise report the role as blocked.
+   available and its actual selection verified; otherwise report the role
+   blocked/incomplete.
 5. **Common evidence contract** — each full reviewer reports severity, location,
    claim, evidence, impact, minimal fix, and confidence. Deep review adds the
    governing authority; Integration adds both sides of the affected contract.
@@ -224,10 +247,12 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
 
 ## Prerequisites
 
-- **GitHub Copilot CLI** with agent `models` and `modelPolicy` support installed
-  and working (verified in version 1.0.95) — see
+- **GitHub Copilot CLI** with agent `model` and `modelPolicy` support installed
+  and working — see
   [github/copilot-cli](https://github.com/github/copilot-cli)
   (typically `npm install -g @github/copilot`, then run `copilot`).
+  Verify actual model selection in your installed CLI; this repo's self-checks
+  validate configuration and deployment, not runtime enforcement.
 - A Copilot plan whose account can access the configured model families (MAI /
   Claude / GPT / Grok). If yours can't, swap the model IDs (see
   [Customization](#customization)).
@@ -238,6 +263,8 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
   configured models or an explicitly chosen replacement.
 - `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
   and by the self-checks).
+- Bash 4 or newer (the installer uses associative arrays). On macOS, the
+  system Bash 3 is insufficient; run the scripts with an installed Bash 4+.
 
 ## Install
 
@@ -254,6 +281,65 @@ automatically. If you're not sure it loaded, ask: *"what agents do you have?"*
 The installer copies all eight definitions and removes previously shipped
 duplicate variants recorded in its manifest.
 
+### Optional building and thinking agents
+
+On a new machine, use the same clone steps above, then opt in:
+
+```bash
+./install.sh --with-extras
+```
+
+This installs ten additional definitions into `~/.copilot/agents/`:
+
+| Group | Agents |
+|---|---|
+| Building | `local-openai-architect`, `local-openai-developer`, `local-claude-architect`, `local-claude-developer`, `local-tech-writer` |
+| Thinking | `local-ideator`, `local-first-principles`, `local-lateral`, `local-pragmatist`, `local-synthesizer` |
+
+Their models remain in their agent frontmatter. The OpenAI building pair is the
+default when building delegation is warranted; the Claude pair is used only when
+explicitly requested.
+
+Two namespaced `*.instructions.md` files are installed into `~/.copilot/instructions/`.
+They apply globally once opted in and describe when to use these agents without
+duplicating or replacing the review pipeline. Existing unrelated instruction
+files are left alone. This release ships no skills.
+
+The extras opt-in is recorded per machine in
+`~/.copilot/.copilot-review-team-extras-manifest`. Subsequent `./install.sh` runs
+update extras automatically only on machines that already opted in. To remove
+extras but keep the review team:
+
+```bash
+./install.sh --without-extras
+```
+
+This removes only extras recorded in their manifest and clears the opt-in.
+Replaced and removed extras are backed up in `.backup-<timestamp>-<pid>/`;
+unrelated agents and instructions are not removed. An existing same-named file
+is backed up before replacement, not automatically restored on uninstall.
+Ownership is recorded before each newly managed file is deployed. If installation
+fails, already deployed extras remain tracked and can be removed with
+`./install.sh --without-extras` or `./uninstall.sh` after the write failure is
+corrected. A failed update keeps prior ownership entries until finalization.
+`./uninstall.sh` removes both the review team and any installed extras;
+`./uninstall.sh --dry-run` changes nothing.
+
+### Update another machine
+
+To pick up published updates on another machine:
+
+```bash
+cd copilot-review-team
+git pull --ff-only
+./install.sh
+```
+
+Restart Copilot after installation and verify actual review-role models before
+counting the review complete. Keep shared definitions in this repo and
+re-run the installer rather than editing the deployed copies independently.
+`./install.sh --help` lists the optional install switches.
+
 > **NOTE — your existing `copilot-instructions.md` is preserved.** The installer
 > merges the playbook in as a **marker-delimited managed block**; anything you wrote
 > yourself stays put. Re-running `./install.sh` upgrades that block in place
@@ -264,7 +350,8 @@ duplicate variants recorded in its manifest.
 Re-running `./install.sh` is a versioned, in-place upgrade: it prints a
 `version -> version` change summary (added / updated / unchanged / removed agents)
 and prunes agents earlier versions shipped but this one no longer does. Unrelated
-`local-*` agents you installed yourself are never touched.
+`local-*` agents you installed yourself are never touched unless their exact
+filenames are also shipped by the selected installation.
 
 `install.sh` and `uninstall.sh` honor a `$COPILOT_HOME` environment variable if your
 Copilot CLI keeps its config somewhere other than the default `~/.copilot`.
@@ -280,16 +367,21 @@ cp agents/local-*.agent.md ~/.copilot/agents/
 # ~/.copilot/copilot-instructions.md (append it; keep anything already there)
 ```
 
+For extras, prefer the installer: it records ownership for upgrades and removal
+and backs up existing same-named files.
+
 To remove the team later, run [`./uninstall.sh`](uninstall.sh) — it removes only
-the agent files this repo installed (your other `local-*` agents are left alone)
-and strips the playbook's managed block. Use `--purge-playbook` to drop the whole
+the core agent names and manifest entries, plus any extras recorded in the extras
+manifest, and strips the playbook's managed block. Unrelated files are left alone.
+Use `--purge-playbook` to drop the whole
 `copilot-instructions.md` instead (it asks first).
 
 ## Customization
 
 The model configuration for each agent lives in one place: the `model:` scalar
 or ordered `models:` block list in that agent's
-`agents/local-*.agent.md` frontmatter. To change models:
+`agents/local-*.agent.md` frontmatter (or `extras/agents/local-*.agent.md` for
+optional agents). To change models:
 
 ```bash
 # edit the model: line in the agent(s) you want to retarget, e.g.
@@ -298,22 +390,28 @@ $EDITOR agents/local-readability-reviewer.agent.md
 ./install.sh        # re-run to push the change into ~/.copilot/
 ```
 
+For an optional agent, edit its file under `extras/agents/` and use
+`./install.sh --with-extras` on a new machine; an already opted-in machine can
+use plain `./install.sh`.
+
 The three primary roles use fixed Sol/Sonnet models, without automatic fallback.
-To retarget them, edit the `models:` block list and keep
-`modelPolicy: required` to prevent unlisted-model substitution. The repository
-validator accepts one or more bare model IDs in block lists, not inline YAML lists.
+To retarget them, edit the scalar `model:` field and keep
+`modelPolicy: required` to request enforcement. Check the actual selected model
+after reinstalling; a successful response alone does not establish compliance.
+The validator also accepts `models:` block lists for custom definitions, but that
+is a syntax check, not a dispatch test.
 
 For example, the Critical Reviewer and QA Tester use:
 
 ```yaml
-models:
-  - gpt-6.1-sol
+model: gpt-6.1-sol
 modelPolicy: required
 ```
 
-The Deep Reviewer uses only `claude-sonnet-5.5`, with the
-same required policy. If the configured model is inaccessible, dispatch is blocked
-rather than silently selecting the session model.
+The Deep Reviewer declares only `claude-sonnet-5.5`, with the same required
+policy. If the CLI rejects it, selects another model or provides no model
+evidence, the lead must report the role blocked/incomplete rather than
+claiming Sonnet review.
 
 For other unavailable models, point the affected
 agent at one your account can use. When swapping, preserve independent family counterweights among the
@@ -322,6 +420,8 @@ or its own semantic tie-break.
 
 If you add or rename an agent, keep the README and playbook tables in sync, then run
 `./scripts/validate.sh` before reinstalling.
+Optional agents belong in `extras/agents/`, with matching roster entries in
+`extras/instructions/`; do not add them to the default review roster.
 
 ### Tracking agent changes
 

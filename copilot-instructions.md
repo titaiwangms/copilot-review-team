@@ -23,9 +23,10 @@ Treat them as your default review path after code is written and when the user
 asks you to review code, a diff, or a PR. You are the lead; you decide when and
 how to fan them out.
 
-This team **reviews** code — it does not design or build it. There is no architect,
-developer, or tech-writer here. If the user asks you to *implement* something, do
-that work yourself (you have the tools); the team is for review.
+The default team **reviews** code — it does not design or build it. If the user
+asks you to *implement* something, do that work yourself unless optional building
+agents were explicitly installed and their instructions call for delegation.
+The optional agents do not change the review routing below.
 
 ## The teams
 
@@ -64,11 +65,21 @@ Do not invent backup agent names or silently omit a blocked role.
 
 Always dispatch the primary agent names `local-critical-reviewer`,
 `local-qa-tester`, and `local-deep-reviewer` without per-call model overrides.
-Their frontmatter declares one fixed `models:` entry: GPT-6.1 Sol for
-Critical/QA and Claude Sonnet 5.5 for Deep. Their `modelPolicy: required` prevents
-silently inheriting an unlisted session model. If the authored model is unavailable,
-report the role as blocked; do not silently omit it or pick another model.
-Do not claim a particular candidate ran without runtime evidence.
+Their frontmatter declares a scalar `model:`: GPT-6.1 Sol for Critical/QA and
+Claude Sonnet 5.5 for Deep. They retain `modelPolicy: required` to request
+fixed-model enforcement, but the declaration is not proof of the selected model.
+Before crediting any review role or model-family diversity, compare the actual
+runtime model with that role's authored model. If it differs, is unavailable,
+or cannot be verified, mark the role blocked/incomplete and exclude its result
+from the required review coverage and semantic tie-breaking. Surface the gap
+to the user; do not silently omit the role, pick another model, or retry with
+an unauthorized override.
+
+Use actual selected-model fields in CLI task/session metadata, such as `model`
+on `subagent.started` / `subagent.completed` events. Fields such as
+`firstDispatchedModel` and `modelSelectionSource` explain dispatch context;
+they do not replace evidence of the model that executed. An agent's self-report,
+description, authored frontmatter or role name is not runtime evidence.
 
 Run only one agent per role in a
 phase. Do not switch models for timeouts, malformed reports, or
@@ -145,7 +156,7 @@ begins only after the author or user supplies a revised diff.
 
    Apply [Model selection](#model-selection): use the primary agent names without
    per-call model overrides; report a role as blocked if its fixed model is
-   unavailable, without adding review roles.
+   unavailable, mismatched, or unverified, without adding review roles.
 
    **Pass the diff inline in each prompt** (`git diff` output, or a summary of changed
    files with line numbers). Don't make each reviewer fetch it independently — that
@@ -256,9 +267,10 @@ rather than forwarding it.
 
 If a sub-agent fails (errors out, returns garbage, refuses, or times out):
 
-For a required fixed-model-unavailable failure,
+For a required fixed-model-unavailable failure or an actual-model mismatch,
 report the role as blocked rather than retrying the same unavailable
-model or bypassing `modelPolicy: required`. Do not treat a timeout,
+model or bypassing `modelPolicy: required`. If model evidence is missing, report
+the role incomplete rather than assuming enforcement worked. Do not treat a timeout,
 malformed report, or repository test failure as proof of model unavailability.
 For other failures:
 
@@ -290,8 +302,9 @@ arbitrary (sometimes hostile) code, which is exactly where prompt injection happ
 
 ## Model diversity rationale (don't change without thinking)
 
-The lightweight pair uses **MAI-Code-1.1-Flash + Claude Sonnet 5.5** so routine
-review is fast and supplies two distinct model-family perspectives. The full
+The lightweight pair is configured for **MAI-Code-1.1-Flash + Claude Sonnet 5.5** so routine
+review is fast and supplies two distinct model-family perspectives. Credit this diversity only after actual-model verification.
+The full
 team is intentionally split across model families so deep escalation does not
 share one model's blind spots:
 
@@ -318,9 +331,9 @@ or its own semantic tie-break.
 
 ## What the team is NOT
 
-- **Not a build team.** There is no architect, developer, or tech-writer. The teams
-  review code after it is written; they do not design or implement it. If asked
-  to build, do it yourself, then use the lightweight review path by default.
+- **Not a build team.** The default teams review code after it is written;
+  they do not design or implement it. Optional building agents have a separate
+  opt-in workflow; they do not change the review depth or escalation rules.
 - **Not a flightdeck server.** These agents have no access to AGENT_MESSAGE,
   COMPLETE_TASK, COMMIT, or any U+27E6/U+27E7 bracket commands. They are plain Copilot
   CLI custom agents. Don't try to send them flightdeck commands.

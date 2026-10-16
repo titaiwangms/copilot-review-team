@@ -5,6 +5,7 @@
 #   - Copies the local-* agent definitions into ~/.copilot/agents/
 #   - Merges the orchestration playbook into ~/.copilot/copilot-instructions.md
 #     as a marker-delimited managed block (your own instructions are preserved)
+#   - With --with-extras, installs optional agents/instructions tracked separately
 #
 # Existing agent files are backed up to ~/.copilot/.backup-<timestamp>-<pid>/
 # before being overwritten, so this is safe to re-run.
@@ -24,6 +25,23 @@
 # re-run this installer.
 
 set -euo pipefail
+
+EXTRAS="auto"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --with-extras) EXTRAS="install" ;;
+    --without-extras) EXTRAS="remove" ;;
+    -h|--help)
+      echo "Usage: ./install.sh [--with-extras | --without-extras]"
+      echo "Default: install the review team; preserve a previous extras opt-in."
+      echo "  --with-extras     also install optional building/thinking agents and instructions"
+      echo "  --without-extras  remove previously installed extras and clear the opt-in"
+      exit 0
+      ;;
+    *) echo "error: unknown argument: $1" >&2; exit 1 ;;
+  esac
+  shift
+done
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COPILOT_DIR="${COPILOT_HOME:-$HOME/.copilot}"
@@ -64,6 +82,19 @@ echo "Installing Copilot Review Team into: $COPILOT_DIR"
 # python3 is required for the playbook merge step. Check BEFORE any destructive
 # work (agent copy/prune) so a missing interpreter can't leave a partial install.
 command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 1; }
+
+if [ "$EXTRAS" = "auto" ]; then
+  EXTRAS="none"
+  if [ -e "$COPILOT_DIR/.copilot-review-team-extras-manifest" ] || \
+     [ -L "$COPILOT_DIR/.copilot-review-team-extras-manifest" ]; then
+    EXTRAS="install"
+  fi
+fi
+if [ "$EXTRAS" = "install" ]; then
+  python3 "$SRC_DIR/scripts/_manage_extras.py" check "$COPILOT_DIR" "$BACKUP_DIR"
+elif [ "$EXTRAS" = "remove" ]; then
+  python3 "$SRC_DIR/scripts/_manage_extras.py" check-remove "$COPILOT_DIR" "$BACKUP_DIR"
+fi
 
 if ! command -v copilot >/dev/null 2>&1; then
   echo "  WARNING: 'copilot' CLI not found on PATH. Files will still be installed, but"
@@ -208,6 +239,10 @@ fi
 backup "$PLAYBOOK"   # safety net retained
 python3 "$SRC_DIR/scripts/_merge_playbook.py" install "$PLAYBOOK" "$SRC_DIR/copilot-instructions.md"
 echo "  playbook: merged managed block into copilot-instructions.md"
+
+if [ "$EXTRAS" != "none" ]; then
+  python3 "$SRC_DIR/scripts/_manage_extras.py" "$EXTRAS" "$COPILOT_DIR" "$BACKUP_DIR"
+fi
 
 # --- Manifest ---
 # Record exactly what we installed so uninstall.sh can clean up precisely.

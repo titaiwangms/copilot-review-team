@@ -86,6 +86,7 @@ def check_frontmatter(text, expected_name):
 def main():
     ok = True
     files = sorted(glob.glob(os.path.join(REPO_ROOT, "agents", "local-*.agent.md")))
+    files += sorted(glob.glob(os.path.join(REPO_ROOT, "extras", "agents", "local-*.agent.md")))
     if not files:
         print("  no agent files found")
         return 1

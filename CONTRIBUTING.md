@@ -29,9 +29,10 @@ anything.
   model-diversity notes in the README and playbook). Each agent's model configuration
   is the `model:` scalar or ordered `models:` block list in its own
   `agents/local-*.agent.md` frontmatter — the single source of truth.
-  Edit it there and re-run `./install.sh`. Keep `modelPolicy: required` on the
-  three fixed-model primary roles so an unavailable model cannot silently
-  inherit the session model.
+  Edit it there and re-run `./install.sh`. Shipped agents use scalar `model:`
+  fields; keep `modelPolicy: required` on the three fixed-model primary roles
+  to request enforcement. Verify the actual runtime model before counting a
+  role as completed; configuration and static tests alone do not prove dispatch.
 
 - **Keep agents self-contained.** Each `local-*.agent.md` is a fresh context — don't
   assume it can see conversation state. (It also keeps each agent's git history clean:
@@ -48,12 +49,18 @@ anything.
   Do not reinterpret unrelated failures as
   model unavailability.
 
-- **Bump the `VERSION` file when shipping changes.** It holds a single semver line
+- **Bump `VERSION` for a new release, not every unreleased commit or PR.** Multiple
+  PRs for the same upcoming release share its version, even if `main` already
+  carries that unreleased number. The current optional-agent and model changes
+  are part of the unreleased `2.4.0`; do not bump them independently.
+  The file holds a single semver line
   (e.g. `1.0.0`). `install.sh` reads it to stamp the install and to print a
   `version -> version` change summary on upgrade. The install manifest
   (`~/.copilot/.copilot-review-team-manifest`) also records `VERSION=` and
   `INSTALLED_AT=` alongside the `AGENT=` lines; bumping `VERSION` is what makes the
-  next install report an upgrade.
+  next release's install report a version upgrade. Installs between unreleased
+  revisions can report the same version on both sides; file-change summaries
+  still identify added, updated and removed agents.
 
 - **Run the self-checks** before submitting:
 
@@ -70,6 +77,13 @@ anything.
   final summary; the exit code is nonzero if any check fails.
   Reviewer-count checks validate reviewer prompts against the primary role count,
   with regression coverage for forks that change the team or add alternate prompts.
+
+- **Keep extras opt-in.** Building/thinking agents belong in `extras/agents/`,
+  with matching roster entries in `extras/instructions/`. Instruction filenames
+  must use `copilot-review-team-<name>.instructions.md`. Default installs must
+  continue to deploy only the review team. Changes to optional deployment must
+  pass the isolated install/upgrade/uninstall tests; never test against your real
+  Copilot home.
 
 - **Don't commit anything private.** No internal repo names, secrets, tokens, or
   org-specific conventions in the shared files.

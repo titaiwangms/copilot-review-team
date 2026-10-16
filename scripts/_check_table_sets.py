@@ -13,26 +13,29 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLAYBOOK = os.path.join(REPO_ROOT, "copilot-instructions.md")
 ROW_RE = re.compile(r"^\|\s*`(local-[a-z-]+)`\s*\|")
 
-agent_files = {
-    os.path.basename(p)[: -len(".agent.md")]
-    for p in glob.glob(os.path.join(REPO_ROOT, "agents", "local-*.agent.md"))
-}
-
-table_agents = set()
-with open(PLAYBOOK, encoding="utf-8") as fh:
-    for line in fh:
-        m = ROW_RE.match(line.rstrip("\n"))
-        if m:
-            table_agents.add(m.group(1))
-
 ok = True
-missing = sorted(agent_files - table_agents)
-extra = sorted(table_agents - agent_files)
-if missing:
-    print("  agents missing from table: %s" % ", ".join(missing))
-    ok = False
-if extra:
-    print("  table rows with no agent file: %s" % ", ".join(extra))
-    ok = False
+for folder, documents in (
+    ("agents", [PLAYBOOK]),
+    ("extras/agents", glob.glob(os.path.join(REPO_ROOT, "extras", "instructions", "*.md"))),
+):
+    agent_files = {
+        os.path.basename(p)[: -len(".agent.md")]
+        for p in glob.glob(os.path.join(REPO_ROOT, folder, "local-*.agent.md"))
+    }
+    table_agents = set()
+    for document in documents:
+        with open(document, encoding="utf-8") as fh:
+            for line in fh:
+                m = ROW_RE.match(line.rstrip("\n"))
+                if m:
+                    table_agents.add(m.group(1))
+    missing = sorted(agent_files - table_agents)
+    extra = sorted(table_agents - agent_files)
+    if missing:
+        print("  %s agents missing from table: %s" % (folder, ", ".join(missing)))
+        ok = False
+    if extra:
+        print("  %s table rows with no agent file: %s" % (folder, ", ".join(extra)))
+        ok = False
 
 sys.exit(0 if ok else 1)

@@ -22,7 +22,9 @@ Fidelity guarantees: the user's content is preserved byte-for-byte. We never
 rstrip whitespace from user lines, we honor the user file's original newline
 style (\r\n vs \n), and install-then-remove over a file that had no managed
 block is a no-op. The only thing install adds (and remove reverses) is a single
-blank-line separator between the user's content and our block.
+blank-line separator between the user's content and our block. A metadata line
+inside the managed block records when that separator supplied a missing final
+newline, so removal can restore the original boundary exactly.
 """
 import os
 import stat
@@ -30,6 +32,7 @@ import sys
 
 BEGIN = "# >>> copilot-review-team (managed — do not edit between markers) >>>"
 END = "# <<< copilot-review-team <<<"
+NO_FINAL_NEWLINE = "<!-- copilot-review-team: preserve missing final newline -->"
 
 
 def _detect_eol(text):
@@ -50,40 +53,33 @@ def _split_managed(text):
     """Split text into (residual_user_text, found_block).
 
     Removes ALL balanced BEGIN..END blocks. Returns the user-owned residual text
-    (with its line endings normalized to bare \\n — callers re-apply the desired
-    EOL) and a bool indicating whether at least one block was removed.
+    with its original line endings and a bool indicating whether at least one
+    block was removed.
 
-    User content is preserved verbatim apart from EOL normalization: trailing
-    whitespace on content lines and trailing blank lines are kept. The single
-    blank-line separator that install inserts before a block IS consumed here so
-    that install-then-remove reverses cleanly.
+    User content is preserved verbatim. The separator and any final newline
+    supplied by install are consumed, so install-then-remove reverses cleanly.
 
     Raises ValueError if the markers are unbalanced or out of order (a BEGIN with
     no matching END, or an END seen before its BEGIN).
     """
-    # Normalize to bare \n for parsing; preserve everything else exactly.
-    norm = text.replace("\r\n", "\n")
-    # splitlines() drops a trailing newline; track it so we can restore it.
-    had_trailing_nl = norm.endswith("\n")
-    lines = norm.split("\n")
-    if had_trailing_nl:
-        # split() leaves a trailing "" after the final \n; drop it so we operate
-        # on actual content lines and re-add the trailing newline at the end.
-        lines = lines[:-1]
-
     out = []
     found = False
     inside = False
-    for line in lines:
+    first_managed_line = False
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        if index < len(lines) - 1:
+            line += "\n"
         stripped = line.strip()
         if stripped == BEGIN:
             if inside:
                 raise ValueError("nested BEGIN marker (missing END before it)")
             inside = True
+            first_managed_line = True
             found = True
             # Drop the single blank-line separator install inserted before the
             # block, if present, so remove reverses install exactly.
-            if out and out[-1] == "":
+            if out and out[-1] in ("\n", "\r\n"):
                 out.pop()
             continue
         if stripped == END:
@@ -91,15 +87,21 @@ def _split_managed(text):
                 raise ValueError("END marker before any BEGIN marker")
             inside = False
             continue
-        if not inside:
+        if inside:
+            if stripped == NO_FINAL_NEWLINE:
+                if not first_managed_line or not out or not out[-1].endswith("\n"):
+                    raise ValueError("invalid missing-final-newline metadata")
+                ending = "\r\n" if line.endswith("\r\n") else "\n"
+                if not out[-1].endswith(ending):
+                    raise ValueError("missing-final-newline metadata has incompatible line ending")
+                out[-1] = out[-1][:-len(ending)]
+            first_managed_line = False
+        else:
             out.append(line)
     if inside:
         raise ValueError("BEGIN marker without a matching END marker")
 
-    residual = "\n".join(out)
-    if had_trailing_nl and residual != "":
-        residual += "\n"
-    return residual, found
+    return "".join(out), found
 
 
 def _atomic_write(path, content):
@@ -151,7 +153,7 @@ def cmd_install(target, source_file):
     # Reject a source that itself contains a marker line: it would corrupt
     # future parsing of the managed block. Compare after stripping per-line.
     for raw in source.replace("\r\n", "\n").split("\n"):
-        if raw.strip() in (BEGIN, END):
+        if raw.strip() in (BEGIN, END, NO_FINAL_NEWLINE):
             sys.stderr.write(
                 "error: source content contains a managed-block marker line "
                 "(%r) — refusing to install (it would corrupt the block).\n"
@@ -165,21 +167,13 @@ def cmd_install(target, source_file):
     eol = _detect_eol(original)
 
     residual, had_block = _split_managed(original)
-    # residual is in bare-\n form with its trailing newline (if any) preserved.
-
-    block = BEGIN + "\n" + source + "\n" + END + "\n"
-    if residual != "":
-        # Ensure the user content ends with a newline before the single blank
-        # separator line, then our block.
-        if not residual.endswith("\n"):
-            residual += "\n"
-        new_content = residual + "\n" + block
-    else:
-        new_content = block
-
-    # Re-apply the user file's original EOL style throughout.
-    if eol != "\n":
-        new_content = new_content.replace("\n", eol)
+    missing_final_newline = bool(residual) and not residual.endswith("\n")
+    metadata = NO_FINAL_NEWLINE + "\n" if missing_final_newline else ""
+    block = (BEGIN + "\n" + metadata + source + "\n" + END + "\n").replace("\n", eol)
+    separator = ""
+    if residual:
+        separator = eol * (2 if missing_final_newline else 1)
+    new_content = residual + separator + block
 
     _atomic_write(target, new_content)
 
@@ -200,9 +194,7 @@ def cmd_remove(target):
         return 0
 
     original = _read(target)
-    eol = _detect_eol(original)
     residual, had_block = _split_managed(original)
-    # residual is in bare-\n form, preserving the user's trailing newlines.
 
     if not had_block:
         print("playbook: no managed block found — left file untouched")
@@ -212,8 +204,6 @@ def cmd_remove(target):
         os.remove(target)
         print("playbook: removed managed block and deleted now-empty file")
     else:
-        if eol != "\n":
-            residual = residual.replace("\n", eol)
         _atomic_write(target, residual)
         print("playbook: removed managed block (preserved user content)")
     return 0
