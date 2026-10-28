@@ -6,6 +6,7 @@
 #   - Merges the orchestration playbook into ~/.copilot/copilot-instructions.md
 #     as a marker-delimited managed block (your own instructions are preserved)
 #   - With --with-extras, installs optional agents/instructions tracked separately
+#   - Unmarked legacy playbooks require explicit --migrate-legacy-playbook consent
 #
 # Existing agent files are backed up to ~/.copilot/.backup-<timestamp>-<pid>/
 # before being overwritten, so this is safe to re-run.
@@ -27,15 +28,18 @@
 set -euo pipefail
 
 EXTRAS="auto"
+MIGRATION_ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --with-extras) EXTRAS="install" ;;
     --without-extras) EXTRAS="remove" ;;
+    --migrate-legacy-playbook) MIGRATION_ARGS=(--migrate-legacy-playbook) ;;
     -h|--help)
-      echo "Usage: ./install.sh [--with-extras | --without-extras]"
+      echo "Usage: ./install.sh [--with-extras | --without-extras] [--migrate-legacy-playbook]"
       echo "Default: install the review team; preserve a previous extras opt-in."
       echo "  --with-extras     also install optional building/thinking agents and instructions"
       echo "  --without-extras  remove previously installed extras and clear the opt-in"
+      echo "  --migrate-legacy-playbook  back up and remove recognized unmarked review/build playbooks"
       exit 0
       ;;
     *) echo "error: unknown argument: $1" >&2; exit 1 ;;
@@ -51,6 +55,7 @@ TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 # Include the PID so two runs within the same second can't clobber each other's
 # backups (which could otherwise overwrite the user's *original* files).
 BACKUP_DIR="$COPILOT_DIR/.backup-$TIMESTAMP-$$"
+PLAYBOOK="$COPILOT_DIR/copilot-instructions.md"
 
 # Version this install ships. Read robustly so a missing/blank VERSION file
 # can't abort the install under `set -e`.
@@ -82,6 +87,7 @@ echo "Installing Copilot Review Team into: $COPILOT_DIR"
 # python3 is required for the playbook merge step. Check BEFORE any destructive
 # work (agent copy/prune) so a missing interpreter can't leave a partial install.
 command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 1; }
+python3 "$SRC_DIR/scripts/_merge_playbook.py" check "$PLAYBOOK" "${MIGRATION_ARGS[@]}"
 
 if [ "$EXTRAS" = "auto" ]; then
   EXTRAS="none"
@@ -231,13 +237,11 @@ fi
 # We DON'T clobber an existing copilot-instructions.md: the playbook is merged in
 # as a marker-delimited managed block, so any instructions you wrote yourself are
 # preserved. We still back the file up first as a safety net.
-PLAYBOOK="$COPILOT_DIR/copilot-instructions.md"
-
 if [ -e "$PLAYBOOK" ]; then
   echo "  NOTE: existing copilot-instructions.md found — backing it up."
 fi
 backup "$PLAYBOOK"   # safety net retained
-python3 "$SRC_DIR/scripts/_merge_playbook.py" install "$PLAYBOOK" "$SRC_DIR/copilot-instructions.md"
+python3 "$SRC_DIR/scripts/_merge_playbook.py" install "$PLAYBOOK" "$SRC_DIR/copilot-instructions.md" "${MIGRATION_ARGS[@]}"
 echo "  playbook: merged managed block into copilot-instructions.md"
 
 if [ "$EXTRAS" != "none" ]; then

@@ -4,16 +4,31 @@
 Run directly (`python3 scripts/_test_merge_playbook.py`) or via
 `python3 -m unittest scripts._test_merge_playbook`. Stdlib only. Exits 0 on pass.
 """
+import contextlib
+import io
 import os
 import stat
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _merge_playbook as mp
 
 SOURCE = "# Playbook heading\n\nsome managed content\n"
+LEGACY = (
+    "# Multi-agent team playbook\n\n"
+    "## The team\n"
+    "local-code-reviewer local-critical-reviewer "
+    "local-deep-reviewer local-integration-reviewer\n"
+    "## Default pipeline for non-trivial tasks\n"
+    "old building/review routing\n"
+    "## Review-only requests (no developer phase)\n"
+    "old review routing\n"
+    "## Repo-specific overrides\n"
+    "old overrides\n\n"
+)
 
 
 class MergePlaybookTest(unittest.TestCase):
@@ -96,6 +111,106 @@ class MergePlaybookTest(unittest.TestCase):
         rc = mp.main(["_merge_playbook.py", "install", self.target, self.source])
         self.assertEqual(rc, 1)
         self.assertEqual(self.read_target(), bad)
+
+    def test_legacy_blocks_install_with_or_without_managed_block(self):
+        for suffix in ("", self.block()):
+            with self.subTest(managed=bool(suffix)):
+                original = "personal\n\n" + LEGACY + suffix
+                self.write_target(original)
+                error = io.StringIO()
+                with contextlib.redirect_stderr(error):
+                    rc = mp.main(["_merge_playbook.py", "install", self.target, self.source])
+                self.assertEqual(rc, 1)
+                self.assertIn("--migrate-legacy-playbook", error.getvalue())
+                self.assertEqual(self.read_target(), original)
+                self.assertEqual(len(os.listdir(self.dir)), 2)
+
+    def test_legacy_migration_preserves_other_sections_bytes_and_permissions(self):
+        for eol in ("\n", "\r\n"):
+            with self.subTest(eol=repr(eol)):
+                personal = "Personal notes  \n\n".replace("\n", eol)
+                thinking = "# Brainstorming / thinking team\n\nkeep thinking\n".replace("\n", eol)
+                trailing = "# Personal section\nno final newline".replace("\n", eol)
+                keep = personal + thinking + trailing
+                original = personal + LEGACY.replace("\n", eol) + thinking + trailing
+                self.write_target_bytes(original.encode("utf-8"))
+                os.chmod(self.target, 0o600)
+                before_backups = set(os.listdir(self.dir))
+                self.assertEqual(mp.cmd_install(self.target, self.source, True), 0)
+                installed = self.read_target_bytes()
+                residual, _ = mp._split_managed(installed.decode("utf-8"))
+                self.assertEqual(residual, keep)
+                self.assertEqual(installed.count(mp.BEGIN.encode("utf-8")), 1)
+                backups = set(os.listdir(self.dir)) - before_backups
+                self.assertEqual(len(backups), 1)
+                backup = os.path.join(self.dir, backups.pop())
+                with open(backup, "rb") as handle:
+                    self.assertEqual(handle.read(), original.encode("utf-8"))
+                self.assertEqual(stat.S_IMODE(os.stat(backup).st_mode), 0o600)
+                self.assertEqual(mp.cmd_install(self.target, self.source, True), 0)
+                self.assertEqual(self.read_target_bytes(), installed)
+                self.assertEqual(set(os.listdir(self.dir)), before_backups | {os.path.basename(backup)})
+                self.assertEqual(mp.cmd_remove(self.target), 0)
+                self.assertEqual(self.read_target_bytes(), keep.encode("utf-8"))
+
+    def test_migration_replaces_legacy_and_existing_managed_copy(self):
+        self.write_target(LEGACY + "# Thinking\nkeep\n\n" + self.block())
+        self.assertEqual(mp.main([
+            "_merge_playbook.py", "install", self.target, self.source,
+            "--migrate-legacy-playbook",
+        ]), 0)
+        out = self.read_target()
+        self.assertNotIn("# Multi-agent team playbook", out)
+        self.assertIn("# Thinking\nkeep", out)
+        self.assertEqual(out.count(mp.BEGIN), 1)
+        self.assertEqual(out.count(SOURCE.strip()), 1)
+
+    def test_check_is_read_only_and_refuses_unrecognized_migration(self):
+        for original in (LEGACY, "# Multi-agent team playbook\ncustom content\n"):
+            with self.subTest(original=original):
+                self.write_target(original)
+                before = set(os.listdir(self.dir))
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(mp.main(["_merge_playbook.py", "check", self.target]), 1)
+                    result = mp.main([
+                        "_merge_playbook.py", "check", self.target,
+                        "--migrate-legacy-playbook",
+                    ])
+                self.assertEqual(result, 0 if original == LEGACY else 1)
+                self.assertEqual(set(os.listdir(self.dir)), before)
+                self.assertEqual(self.read_target(), original)
+
+    def test_migration_failure_leaves_original_and_backup(self):
+        self.write_target(LEGACY)
+        with mock.patch.object(mp, "_atomic_write", side_effect=OSError("write failed")):
+            with self.assertRaises(OSError):
+                mp.cmd_install(self.target, self.source, True)
+        self.assertEqual(self.read_target(), LEGACY)
+        backups = [name for name in os.listdir(self.dir) if ".legacy-" in name]
+        self.assertEqual(len(backups), 1)
+        with open(os.path.join(self.dir, backups[0]), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), LEGACY)
+
+    def test_unclosed_fence_cannot_hide_a_section_boundary_during_migration(self):
+        original = LEGACY + "```text\n# Personal notes\nkeep me\n"
+        self.write_target(original)
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(mp.main([
+                "_merge_playbook.py", "install", self.target, self.source,
+                "--migrate-legacy-playbook",
+            ]), 1)
+        self.assertEqual(self.read_target(), original)
+        self.assertEqual(len(os.listdir(self.dir)), 2)
+
+    def test_legacy_headings_inside_fenced_examples_are_preserved(self):
+        for fence in ("```markdown", "~~~~"):
+            with self.subTest(fence=fence):
+                original = fence + "\n" + LEGACY + fence[:3] + "\n"
+                if fence.startswith("~"):
+                    original = fence + "\n" + LEGACY + "~~~~\n"
+                self.write_target(original)
+                self.assertEqual(mp.cmd_install(self.target, self.source), 0)
+                self.assertTrue(self.read_target().startswith(original))
 
     # --- remove ---
 

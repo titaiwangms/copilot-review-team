@@ -286,6 +286,45 @@ class InstallIntegrationTests(unittest.TestCase):
         self.assertFalse((self.home / "instructions").exists())
         self.assertFalse((self.home / extras.MANIFEST).exists())
 
+    def test_unmarked_playbook_aborts_before_any_installation_changes(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        target.write_bytes((ROOT / "copilot-instructions.md").read_bytes())
+        before = self.snapshot()
+        result = self.run_script("install.sh", expected=1)
+        self.assertIn("--migrate-legacy-playbook", result.stderr)
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.home / "agents").exists())
+
+    def test_explicit_migration_preserves_thinking_and_backs_up_duplicate(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        source = (ROOT / "copilot-instructions.md").read_text(encoding="utf-8")
+        thinking = "# Brainstorming / thinking team\n\nkeep thinking\n"
+        personal = "# Personal notes\nkeep notes"
+        original = (source + "\n" + thinking + personal).encode("utf-8")
+        target.write_bytes(original)
+        self.run_script("install.sh", "--migrate-legacy-playbook")
+        backups = list(self.home.glob(".backup-*/copilot-instructions.md"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), original)
+        installed = target.read_bytes()
+        self.assertTrue(installed.startswith((thinking + personal).encode("utf-8")))
+        self.assertEqual(installed.count(source.encode("utf-8")), 1)
+        self.run_script("install.sh")
+        self.assertEqual(target.read_bytes(), installed)
+        self.run_script("uninstall.sh")
+        self.assertEqual(target.read_bytes(), (thinking + personal).encode("utf-8"))
+
+    def test_unknown_legacy_structure_aborts_even_with_migration_flag(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        target.write_text("# Multi-agent team playbook\ncustomized routing\n", encoding="utf-8")
+        before = self.snapshot()
+        self.run_script("install.sh", "--migrate-legacy-playbook", expected=1)
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.home / "agents").exists())
+
     def test_opt_in_persists_and_opt_out_clears_it(self):
         self.run_script("install.sh", "--with-extras")
         expected = {p.name for p in (ROOT / "agents").glob("*.agent.md")}

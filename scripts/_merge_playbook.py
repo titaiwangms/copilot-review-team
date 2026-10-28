@@ -4,14 +4,18 @@
 Used by BOTH install.sh and uninstall.sh to manage this repo's content inside a
 user's copilot-instructions.md without clobbering anything they wrote. Our
 content lives between two sentinel markers; everything outside the markers is the
-user's and is preserved verbatim.
+user's and is preserved verbatim unless legacy migration is explicitly requested.
 
 CLI:
-    _merge_playbook.py install <target_playbook> <source_content_file>
+    _merge_playbook.py check <target_playbook> [--migrate-legacy-playbook]
+    _merge_playbook.py install <target_playbook> <source_content_file> [--migrate-legacy-playbook]
     _merge_playbook.py remove  <target_playbook>
 
 install: strip any existing managed block(s), then append a single fresh managed
 block holding the source content. Running it twice is idempotent.
+Unmarked legacy playbooks block installation unless migration is explicitly
+requested. Migration backs up the original before removing recognized sections.
+check: validate the target and migration eligibility without writing anything.
 
 remove: strip the managed block(s); delete the file if nothing else remains.
 
@@ -27,12 +31,28 @@ inside the managed block records when that separator supplied a missing final
 newline, so removal can restore the original boundary exactly.
 """
 import os
+import re
 import stat
 import sys
+import tempfile
 
 BEGIN = "# >>> copilot-review-team (managed — do not edit between markers) >>>"
 END = "# <<< copilot-review-team <<<"
 NO_FINAL_NEWLINE = "<!-- copilot-review-team: preserve missing final newline -->"
+LEGACY_HEADINGS = {
+    "# Multi-agent team playbook": (
+        "## The team",
+        "## Default pipeline for non-trivial tasks",
+        "## Review-only requests (no developer phase)",
+        "## Repo-specific overrides",
+    ),
+    "# Multi-agent review team playbook": (
+        "## The teams",
+        "## Match review depth to task size",
+        "## Review pipeline",
+        "## Repo-specific overrides",
+    ),
+}
 
 
 def _detect_eol(text):
@@ -148,7 +168,68 @@ def _read(path):
         return handle.read()
 
 
-def cmd_install(target, source_file):
+def _legacy_ranges(text):
+    """Locate whole unmarked playbooks, excluding headings inside code fences."""
+    headings = []
+    fence = None
+    offset = 0
+    for number, line in enumerate(text.split("\n"), 1):
+        stripped = line.rstrip("\r")
+        match = re.match(r" {0,3}(`{3,}|~{3,})(.*)$", stripped)
+        if fence:
+            if (
+                match and match[1][0] == fence[0]
+                and len(match[1]) >= len(fence) and not match[2].strip()
+            ):
+                fence = None
+        elif match:
+            fence = match[1]
+        else:
+            heading = re.fullmatch(r" {0,3}# +(.+?) *(?: +#+ *)?", stripped)
+            if heading:
+                headings.append((offset, number, "# " + heading[1]))
+        offset += len(line) + 1
+    if fence and any(heading in LEGACY_HEADINGS for _, _, heading in headings):
+        raise ValueError(
+            "unterminated code fence in legacy playbook; cannot bound migration safely"
+        )
+    ranges = []
+    for index, (start, number, heading) in enumerate(headings):
+        if heading in LEGACY_HEADINGS:
+            end = headings[index + 1][0] if index + 1 < len(headings) else len(text)
+            ranges.append((start, end, number, heading))
+    return ranges
+
+
+def _prepare_target(original, migrate_legacy=False):
+    residual, had_block = _split_managed(original)
+    ranges = _legacy_ranges(residual)
+    if ranges and not migrate_legacy:
+        lines = ", ".join(str(item[2]) for item in ranges)
+        raise ValueError(
+            "unmarked legacy playbook outside managed markers at residual line(s) %s; "
+            "review the section, then rerun install.sh with --migrate-legacy-playbook "
+            "to back up and remove it, or remove it manually" % lines
+        )
+    for start, end, _, heading in ranges:
+        section = residual[start:end]
+        lines = {line.strip() for line in section.split("\n")}
+        if not all(item in lines for item in LEGACY_HEADINGS[heading]) or not all(
+            name in section for name in (
+                "local-code-reviewer", "local-critical-reviewer",
+                "local-deep-reviewer", "local-integration-reviewer",
+            )
+        ):
+            raise ValueError(
+                "unrecognized legacy playbook structure; refusing automatic migration. "
+                "Back up and remove obsolete routing manually"
+            )
+    for start, end, _, _ in reversed(ranges):
+        residual = residual[:start] + residual[end:]
+    return residual, had_block, bool(ranges)
+
+
+def cmd_install(target, source_file, migrate_legacy=False):
     source = _read(source_file)
     # Reject a source that itself contains a marker line: it would corrupt
     # future parsing of the managed block. Compare after stripping per-line.
@@ -166,7 +247,7 @@ def cmd_install(target, source_file):
     original = _read(target)
     eol = _detect_eol(original)
 
-    residual, had_block = _split_managed(original)
+    residual, had_block, migrated = _prepare_target(original, migrate_legacy)
     missing_final_newline = bool(residual) and not residual.endswith("\n")
     metadata = NO_FINAL_NEWLINE + "\n" if missing_final_newline else ""
     block = (BEGIN + "\n" + metadata + source + "\n" + END + "\n").replace("\n", eol)
@@ -175,6 +256,15 @@ def cmd_install(target, source_file):
         separator = eol * (2 if missing_final_newline else 1)
     new_content = residual + separator + block
 
+    if migrated:
+        descriptor, backup = tempfile.mkstemp(
+            prefix=os.path.basename(target) + ".legacy-",
+            suffix=".bak", dir=os.path.dirname(os.path.abspath(target)),
+        )
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+            handle.write(original)
+        os.chmod(backup, stat.S_IMODE(os.stat(target).st_mode))
+        print("playbook: legacy original backed up to %s" % backup)
     _atomic_write(target, new_content)
 
     if not existed:
@@ -211,17 +301,25 @@ def cmd_remove(target):
 
 def main(argv):
     if len(argv) < 2:
-        sys.stderr.write("usage: _merge_playbook.py install|remove ...\n")
+        sys.stderr.write("usage: _merge_playbook.py check|install|remove ...\n")
         return 2
     mode = argv[1]
     try:
-        if mode == "install":
-            if len(argv) != 4:
+        if mode in ("check", "install"):
+            arguments = argv[2:]
+            migrate_legacy = bool(arguments and arguments[-1] == "--migrate-legacy-playbook")
+            if migrate_legacy:
+                arguments = arguments[:-1]
+            if len(arguments) != (2 if mode == "install" else 1):
                 sys.stderr.write(
-                    "usage: _merge_playbook.py install <target> <source_file>\n"
+                    "usage: _merge_playbook.py check <target> [--migrate-legacy-playbook]\n"
+                    "   or: _merge_playbook.py install <target> <source_file> [--migrate-legacy-playbook]\n"
                 )
                 return 2
-            return cmd_install(argv[2], argv[3])
+            if mode == "check":
+                _prepare_target(_read(arguments[0]), migrate_legacy)
+                return 0
+            return cmd_install(arguments[0], arguments[1], migrate_legacy)
         if mode == "remove":
             if len(argv) != 3:
                 sys.stderr.write("usage: _merge_playbook.py remove <target>\n")
@@ -230,10 +328,10 @@ def main(argv):
     except ValueError as exc:
         sys.stderr.write(
             "error: %s in %s — refusing to touch the file. "
-            "Fix the markers by hand and re-run.\n" % (exc, argv[2])
+            "Review the reported issue before re-running.\n" % (exc, argv[2])
         )
         return 1
-    sys.stderr.write("error: unknown mode %r (expected install|remove)\n" % mode)
+    sys.stderr.write("error: unknown mode %r (expected check|install|remove)\n" % mode)
     return 2
 
 

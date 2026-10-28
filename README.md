@@ -56,7 +56,7 @@ own semantic tie-break.
 
 The playbook defines the full tiers; quick version:
 
-- **Trivial** (typo, one-liner, doc-only): the lead reads it; no team.
+- **Trivial** (typos, formatting, non-behavioral documentation): the lead reads it; no team.
 - **Routine** (bounded scope, no escalation trigger): lightweight pair.
 - **Risky or wide**: full reviewer fan-out; add the QA tester only when runtime
   evidence is needed.
@@ -199,16 +199,32 @@ revised diff before another review cycle begins.
 
 ### Escalation triggers
 
+Lightweight review is the default for behavioral changes, including one-line
+fixes. Merely touching a sensitive subsystem does not trigger full review:
+route by changed semantics and the evidence needed to check them.
+
 Use the full team immediately, or escalate from lightweight review, for:
 
-- authentication, authorization, secrets, cryptography, or untrusted input
-- destructive persistence, migrations, or data-format compatibility
-- public APIs, schemas, wire/event formats, ABI, or serialization
-- concurrency, locking, or resource lifecycles
-- external specifications, numerical proofs, or bit-level invariants
-- changes requiring transitive tracing beyond direct consumers
-- runtime behavior that cannot be settled by reading
-- a possible Critical issue, or scope/intent that cannot be bounded confidently
+- changes to authentication, authorization, secret handling, or cryptography
+- changes to how untrusted data crosses a trust boundary or reaches privileged
+  or destructive operations
+- changes to destructive persistence behavior, migration semantics, or
+  data-format compatibility
+- changes that break public API, schema, wire/event, ABI, or serialization
+  contracts, or whose compatibility cannot be established from direct consumers
+- changes to concurrency, locking, or resource ownership/lifetime semantics
+- changes to numerical/bit-level invariants, or correctness questions requiring
+  external specifications or proofs
+- evidence that review requires transitive tracing beyond direct consumers
+- a concrete correctness question requiring runtime evidence beyond ordinary
+  targeted tests, a possible Critical issue, or scope/intent that remains unclear
+  after bounded inspection
+
+A local parser error-path fix or an additive API helper whose compatibility is
+clear from direct consumers can stay lightweight. An auth bypass, changed wire
+format, or lock-order change requires full review even in a small diff. Each
+escalation cites changed behavior or an unresolved relationship, not just a
+category name.
 
 ### Severity levels
 
@@ -347,6 +363,22 @@ re-run the installer rather than editing the deployed copies independently.
 > instructions behind. The file is also backed up to
 > `~/.copilot/.backup-<timestamp>-<pid>/` as a safety net.
 
+If an unmarked old playbook exists outside the managed markers, installation
+stops before changing agents or instructions. Review the reported section and,
+to explicitly migrate a recognized legacy layout, run:
+
+```bash
+./install.sh --migrate-legacy-playbook
+```
+
+Migration backs up the original, removes the entire recognized review/build
+section (including custom edits within that section), and installs one managed
+playbook. Other top-level sections, including thinking and personal instructions,
+are preserved. A standalone `copilot-instructions.md.legacy-*.bak` backup is
+also kept alongside the target before the migration write. If the legacy layout
+cannot be recognized, even this flag refuses to remove it; back up and edit it
+manually instead. Restart Copilot after migration to load the new routing.
+
 Re-running `./install.sh` is a versioned, in-place upgrade: it prints a
 `version -> version` change summary (added / updated / unchanged / removed agents)
 and prunes agents earlier versions shipped but this one no longer does. Unrelated
@@ -363,9 +395,12 @@ No installer? Copy the pieces by hand:
 ```bash
 mkdir -p ~/.copilot/agents
 cp agents/local-*.agent.md ~/.copilot/agents/
-# then paste this repo's copilot-instructions.md into
-# ~/.copilot/copilot-instructions.md (append it; keep anything already there)
+python3 scripts/_merge_playbook.py install \
+  ~/.copilot/copilot-instructions.md copilot-instructions.md
 ```
+
+Use the merge helper rather than pasting an unmarked copy of the playbook; it
+preserves other instructions and keeps repeated updates idempotent.
 
 For extras, prefer the installer: it records ownership for upgrades and removal
 and backs up existing same-named files.
