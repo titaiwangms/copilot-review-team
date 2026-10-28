@@ -302,7 +302,7 @@ arbitrary (sometimes hostile) code, which is exactly where prompt injection happ
 
 ## Model diversity rationale (don't change without thinking)
 
-The lightweight pair is configured for **MAI-Code-1.1-Flash + Claude Sonnet 5.5** so routine
+The lightweight pair is configured for **MAI-Code-2-Flash + Claude Sonnet 5.5** so routine
 review is fast and supplies two distinct model-family perspectives. Credit this diversity only after actual-model verification.
 The full
 team is intentionally split across model families so deep escalation does not

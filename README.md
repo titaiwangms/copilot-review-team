@@ -15,7 +15,7 @@ sessions or logs are synced.
 
 The playbook provides two deliberately separate paths:
 
-- **Lightweight team:** MAI-Code-1.1-Flash checks implementation correctness while
+- **Lightweight team:** MAI-Code-2-Flash checks implementation correctness while
   Claude Sonnet 5.5 checks semantic and adversarial risk.
 - **Full team:** five deep specialists plus an optional QA tester handle risky,
   wide, or escalated changes.
@@ -71,7 +71,7 @@ are read from those files.
 
 | Agent | Role | Model | Why this model |
 |---|---|---|---|
-| `local-lightweight-code-review` | Fast implementation correctness, tests, and direct callers | `mai-code-1.1-flash` | Low-latency coding specialist for routine real-time review |
+| `local-lightweight-code-review` | Fast implementation correctness, tests, and direct callers | `mai-code-2-flash` | Low-latency coding specialist for routine real-time review |
 | `local-lightweight-risk-review` | Fast semantic intent, failure modes, and local contracts | `claude-sonnet-5.5` | Strong reasoning and a different family from a GPT developer |
 | `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-5.5` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
 | `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-6.1-sol` | Local implementation correctness and test-quality lens |
