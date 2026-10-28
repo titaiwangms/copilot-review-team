@@ -377,7 +377,10 @@ playbook. Other top-level sections, including thinking and personal instructions
 are preserved. A standalone `copilot-instructions.md.legacy-*.bak` backup is
 also kept alongside the target before the migration write. If the legacy layout
 cannot be recognized, even this flag refuses to remove it; back up and edit it
-manually instead. Restart Copilot after migration to load the new routing.
+manually instead. Tab-separated and empty ATX H1 headings delimit preserved
+sections. A possible Setext H1 boundary (`Title` followed by `===`) inside a
+proposed removal range blocks automatic migration rather than guessing which
+text belongs to it. Restart Copilot after migration to load the new routing.
 
 Re-running `./install.sh` is a versioned, in-place upgrade: it prints a
 `version -> version` change summary (added / updated / unchanged / removed agents)

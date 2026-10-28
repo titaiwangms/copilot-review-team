@@ -171,6 +171,7 @@ def _read(path):
 def _legacy_ranges(text):
     """Locate whole unmarked playbooks, excluding headings inside code fences."""
     headings = []
+    setext_underlines = []
     fence = None
     offset = 0
     for number, line in enumerate(text.split("\n"), 1):
@@ -185,9 +186,12 @@ def _legacy_ranges(text):
         elif match:
             fence = match[1]
         else:
-            heading = re.fullmatch(r" {0,3}# +(.+?) *(?: +#+ *)?", stripped)
+            heading = re.fullmatch(r" {0,3}#(?:[ \t]+(.*))?", stripped)
             if heading:
-                headings.append((offset, number, "# " + heading[1]))
+                title = re.sub(r"(?:^|[ \t]+)#+[ \t]*$", "", heading[1] or "").strip(" \t")
+                headings.append((offset, number, "# " + title))
+            elif re.fullmatch(r" {0,3}=+[ \t]*", stripped):
+                setext_underlines.append(offset)
         offset += len(line) + 1
     if fence and any(heading in LEGACY_HEADINGS for _, _, heading in headings):
         raise ValueError(
@@ -197,6 +201,11 @@ def _legacy_ranges(text):
     for index, (start, number, heading) in enumerate(headings):
         if heading in LEGACY_HEADINGS:
             end = headings[index + 1][0] if index + 1 < len(headings) else len(text)
+            if any(start < offset < end for offset in setext_underlines):
+                raise ValueError(
+                    "possible Setext H1 boundary in legacy playbook; "
+                    "refusing automatic migration. Back up and edit obsolete routing manually"
+                )
             ranges.append((start, end, number, heading))
     return ranges
 

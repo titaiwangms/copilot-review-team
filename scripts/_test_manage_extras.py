@@ -325,6 +325,27 @@ class InstallIntegrationTests(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)
         self.assertFalse((self.home / "agents").exists())
 
+    def test_tabbed_personal_heading_survives_migration_and_uninstall(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        source = (ROOT / "copilot-instructions.md").read_bytes()
+        personal = b"#\tPersonal instructions\r\nkeep personal notes"
+        target.write_bytes(source + b"\n" + personal)
+        self.run_script("install.sh", "--migrate-legacy-playbook")
+        self.run_script("uninstall.sh")
+        self.assertEqual(target.read_bytes(), personal)
+
+    def test_setext_personal_heading_aborts_before_any_installation_changes(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        source = (ROOT / "copilot-instructions.md").read_bytes()
+        target.write_bytes(source + b"\nPersonal instructions\n=====\nkeep personal notes\n")
+        before = self.snapshot()
+        result = self.run_script("install.sh", "--migrate-legacy-playbook", expected=1)
+        self.assertIn("Setext", result.stderr)
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.home / "agents").exists())
+
     def test_opt_in_persists_and_opt_out_clears_it(self):
         self.run_script("install.sh", "--with-extras")
         expected = {p.name for p in (ROOT / "agents").glob("*.agent.md")}

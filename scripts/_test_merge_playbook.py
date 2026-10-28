@@ -165,6 +165,47 @@ class MergePlaybookTest(unittest.TestCase):
         self.assertEqual(out.count(mp.BEGIN), 1)
         self.assertEqual(out.count(SOURCE.strip()), 1)
 
+    def test_migration_preserves_tabbed_and_empty_atx_section_boundaries(self):
+        for heading in ("#\tPersonal", "   # \tPersonal\t###\t", "#", "#\t"):
+            for eol in ("\n", "\r\n"):
+                with self.subTest(heading=heading, eol=repr(eol)):
+                    personal = (heading + "\nkeep personal instructions").replace("\n", eol)
+                    original = LEGACY.replace("\n", eol) + personal
+                    self.write_target_bytes(original.encode("utf-8"))
+                    self.assertEqual(mp.cmd_install(self.target, self.source, True), 0)
+                    self.assertEqual(mp.cmd_remove(self.target), 0)
+                    self.assertEqual(self.read_target_bytes(), personal.encode("utf-8"))
+
+    def test_setext_boundaries_refuse_migration_without_writes(self):
+        for personal in (
+            "Personal\n========\nkeep instructions",
+            "Personal\nreview guidance\n= \t\nkeep instructions",
+            "  Personal\n   === \t\nkeep instructions",
+        ):
+            for eol in ("\n", "\r\n"):
+                with self.subTest(personal=personal, eol=repr(eol)):
+                    original = (LEGACY + personal + "\n\n" + self.block()).replace("\n", eol)
+                    self.write_target_bytes(original.encode("utf-8"))
+                    before = set(os.listdir(self.dir))
+                    for arguments in (
+                        ["check", self.target],
+                        ["install", self.target, self.source],
+                    ):
+                        error = io.StringIO()
+                        with contextlib.redirect_stderr(error):
+                            self.assertEqual(mp.main([
+                                "_merge_playbook.py", *arguments, "--migrate-legacy-playbook",
+                            ]), 1)
+                        self.assertIn("Setext", error.getvalue())
+                        self.assertEqual(self.read_target_bytes(), original.encode("utf-8"))
+                        self.assertEqual(set(os.listdir(self.dir)), before)
+
+    def test_setext_examples_inside_fences_do_not_block_migration(self):
+        self.write_target(LEGACY + "```markdown\nPersonal\n===\n```\n# Personal\nkeep\n")
+        self.assertEqual(mp.cmd_install(self.target, self.source, True), 0)
+        self.assertEqual(mp.cmd_remove(self.target), 0)
+        self.assertEqual(self.read_target(), "# Personal\nkeep\n")
+
     def test_check_is_read_only_and_refuses_unrecognized_migration(self):
         for original in (LEGACY, "# Multi-agent team playbook\ncustom content\n"):
             with self.subTest(original=original):
