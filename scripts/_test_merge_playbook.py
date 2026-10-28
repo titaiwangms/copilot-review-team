@@ -176,6 +176,56 @@ class MergePlaybookTest(unittest.TestCase):
                     self.assertEqual(mp.cmd_remove(self.target), 0)
                     self.assertEqual(self.read_target_bytes(), personal.encode("utf-8"))
 
+    def test_bom_legacy_is_detected_and_migration_preserves_bom_and_personal_section(self):
+        for eol in ("\n", "\r\n"):
+            for managed in (False, True):
+                with self.subTest(eol=repr(eol), managed=managed):
+                    personal = "# Personal\nkeep instructions".replace("\n", eol)
+                    original = "\ufeff" + LEGACY.replace("\n", eol) + personal
+                    if managed:
+                        block = self.block().replace(
+                            mp.BEGIN + "\n", mp.BEGIN + "\n" + mp.NO_FINAL_NEWLINE + "\n",
+                        )
+                        original += eol * 2 + block.replace("\n", eol)
+                    self.write_target_bytes(original.encode("utf-8"))
+                    before = set(os.listdir(self.dir))
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(mp.main([
+                            "_merge_playbook.py", "check", self.target,
+                        ]), 1)
+                    self.assertEqual(self.read_target_bytes(), original.encode("utf-8"))
+                    self.assertEqual(set(os.listdir(self.dir)), before)
+                    self.assertEqual(mp.cmd_install(self.target, self.source, True), 0)
+                    backups = set(os.listdir(self.dir)) - before
+                    self.assertEqual(len(backups), 1)
+                    with open(os.path.join(self.dir, backups.pop()), "rb") as handle:
+                        self.assertEqual(handle.read(), original.encode("utf-8"))
+                    installed = self.read_target_bytes()
+                    self.assertEqual(mp.cmd_install(self.target, self.source), 0)
+                    self.assertEqual(self.read_target_bytes(), installed)
+                    self.assertEqual(mp.cmd_remove(self.target), 0)
+                    self.assertEqual(self.read_target_bytes(), ("\ufeff" + personal).encode("utf-8"))
+
+    def test_inline_backticks_do_not_hide_personal_heading_and_fenced_example(self):
+        for inline in ("```inline```", "```language `invalid`", "````example `tick`"):
+            for eol in ("\n", "\r\n"):
+                with self.subTest(inline=inline, eol=repr(eol)):
+                    personal = "# Personal\nkeep instructions\n```python\nexample()\n```\n"
+                    personal = personal.replace("\n", eol)
+                    original = (LEGACY + inline + "\n").replace("\n", eol) + personal
+                    self.write_target_bytes(original.encode("utf-8"))
+                    self.assertEqual(mp.cmd_install(self.target, self.source, True), 0)
+                    self.assertEqual(mp.cmd_remove(self.target), 0)
+                    self.assertEqual(self.read_target_bytes(), personal.encode("utf-8"))
+
+    def test_tilde_fence_info_may_contain_backticks_without_exposing_inner_headings(self):
+        self.write_target(
+            LEGACY + "~~~example `tick`\n# Example only\n~~~\n# Personal\nkeep\n"
+        )
+        self.assertEqual(mp.cmd_install(self.target, self.source, True), 0)
+        self.assertEqual(mp.cmd_remove(self.target), 0)
+        self.assertEqual(self.read_target(), "# Personal\nkeep\n")
+
     def test_setext_boundaries_refuse_migration_without_writes(self):
         for personal in (
             "Personal\n========\nkeep instructions",

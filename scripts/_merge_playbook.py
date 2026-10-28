@@ -176,6 +176,8 @@ def _legacy_ranges(text):
     offset = 0
     for number, line in enumerate(text.split("\n"), 1):
         stripped = line.rstrip("\r")
+        bom_width = 1 if number == 1 and stripped.startswith("\ufeff") else 0
+        stripped = stripped[bom_width:]
         match = re.match(r" {0,3}(`{3,}|~{3,})(.*)$", stripped)
         if fence:
             if (
@@ -183,13 +185,13 @@ def _legacy_ranges(text):
                 and len(match[1]) >= len(fence) and not match[2].strip()
             ):
                 fence = None
-        elif match:
+        elif match and (match[1][0] == "~" or "`" not in match[2]):
             fence = match[1]
         else:
             heading = re.fullmatch(r" {0,3}#(?:[ \t]+(.*))?", stripped)
             if heading:
                 title = re.sub(r"(?:^|[ \t]+)#+[ \t]*$", "", heading[1] or "").strip(" \t")
-                headings.append((offset, number, "# " + title))
+                headings.append((offset + bom_width, number, "# " + title))
             elif re.fullmatch(r" {0,3}=+[ \t]*", stripped):
                 setext_underlines.append(offset)
         offset += len(line) + 1

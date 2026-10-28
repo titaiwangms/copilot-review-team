@@ -335,6 +335,34 @@ class InstallIntegrationTests(unittest.TestCase):
         self.run_script("uninstall.sh")
         self.assertEqual(target.read_bytes(), personal)
 
+    def test_bom_legacy_blocks_default_install_and_preserves_personal_content_on_migration(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        source = (ROOT / "copilot-instructions.md").read_bytes()
+        personal = b"# Personal instructions\r\nkeep personal notes"
+        original = b"\xef\xbb\xbf" + source + b"\n" + personal
+        target.write_bytes(original)
+        before = self.snapshot()
+        self.run_script("install.sh", expected=1)
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.home / "agents").exists())
+        self.run_script("install.sh", "--migrate-legacy-playbook")
+        backups = list(self.home.glob(".backup-*/copilot-instructions.md"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), original)
+        self.run_script("uninstall.sh")
+        self.assertEqual(target.read_bytes(), b"\xef\xbb\xbf" + personal)
+
+    def test_inline_backticks_preserve_personal_section_during_migration(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        source = (ROOT / "copilot-instructions.md").read_bytes()
+        personal = b"# Personal instructions\nkeep notes\n```python\nexample()\n```\n"
+        target.write_bytes(source + b"\n```inline```\n" + personal)
+        self.run_script("install.sh", "--migrate-legacy-playbook")
+        self.run_script("uninstall.sh")
+        self.assertEqual(target.read_bytes(), personal)
+
     def test_setext_personal_heading_aborts_before_any_installation_changes(self):
         self.home.mkdir()
         target = self.home / "copilot-instructions.md"
