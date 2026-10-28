@@ -1,7 +1,7 @@
 ---
 name: local-lightweight-code-review
 description: "Fast implementation review for real-time coding feedback: correctness, boundaries, tests, and direct callers."
-model: mai-code-1.1-flash
+model: mai-code-2-flash
 tools:
   - read
   - search
