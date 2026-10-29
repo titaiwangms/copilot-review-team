@@ -13,6 +13,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _manage_extras as extras
+import _merge_playbook as playbook
 from _check_frontmatter import check_frontmatter
 from _check_tools import tool_policy_errors
 from _lib_parsing import parse_tools
@@ -20,6 +21,10 @@ from _lib_parsing import parse_tools
 ROOT = Path(__file__).resolve().parent.parent
 AGENT = "agents/local-example.agent.md"
 INSTRUCTION = "instructions/copilot-review-team-example.instructions.md"
+TEAM_INSTRUCTION = "instructions/copilot-review-team.instructions.md"
+GLOBAL_COMMENT = (
+    b"<!-- Review team instructions: instructions/copilot-review-team.instructions.md -->\n"
+)
 
 
 class ExtrasTests(unittest.TestCase):
@@ -262,12 +267,13 @@ class InstallIntegrationTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.home = Path(temporary.name) / "copilot"
-        self.env = dict(os.environ, COPILOT_HOME=str(self.home))
+        self.env = dict(os.environ, COPILOT_HOME=str(self.home),
+                        HOME=str(Path(temporary.name) / "user-home"))
 
-    def run_script(self, script, *args, expected=0):
+    def run_script(self, script, *args, expected=0, input_text=None):
         result = subprocess.run(
             ["bash", str(ROOT / script), *args], env=self.env, cwd=ROOT,
-            text=True, capture_output=True, timeout=30, check=False,
+            text=True, capture_output=True, timeout=30, check=False, input=input_text,
         )
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         return result
@@ -279,100 +285,206 @@ class InstallIntegrationTests(unittest.TestCase):
         return {p.relative_to(self.home).as_posix(): p.read_bytes()
                 for p in self.home.rglob("*") if p.is_file()}
 
+    def expected_team_content(self):
+        return b'---\napplyTo: "**"\n---\n\n' + (ROOT / "copilot-instructions.md").read_bytes()
+
     def test_default_install_is_review_only(self):
         self.run_script("install.sh")
         expected = {p.name for p in (ROOT / "agents").glob("*.agent.md")}
         self.assertEqual(self.installed_agents(), expected)
-        self.assertFalse((self.home / "instructions").exists())
+        self.assertEqual((self.home / TEAM_INSTRUCTION).read_bytes(), self.expected_team_content())
+        self.assertEqual(list((self.home / "instructions").iterdir()),
+                         [self.home / TEAM_INSTRUCTION])
+        self.assertFalse((self.home / "copilot-instructions.md").exists())
         self.assertFalse((self.home / extras.MANIFEST).exists())
+        self.run_script("uninstall.sh")
+        self.assertFalse((self.home / TEAM_INSTRUCTION).exists())
+        self.assertFalse((self.home / "copilot-instructions.md").exists())
 
-    def test_unmarked_playbook_aborts_before_any_installation_changes(self):
-        self.home.mkdir()
-        target = self.home / "copilot-instructions.md"
-        target.write_bytes((ROOT / "copilot-instructions.md").read_bytes())
-        before = self.snapshot()
-        result = self.run_script("install.sh", expected=1)
-        self.assertIn("--migrate-legacy-playbook", result.stderr)
-        self.assertEqual(self.snapshot(), before)
-        self.assertFalse((self.home / "agents").exists())
-
-    def test_explicit_migration_preserves_thinking_and_backs_up_duplicate(self):
-        self.home.mkdir()
-        target = self.home / "copilot-instructions.md"
-        source = (ROOT / "copilot-instructions.md").read_text(encoding="utf-8")
-        thinking = "# Brainstorming / thinking team\n\nkeep thinking\n"
-        personal = "# Personal notes\nkeep notes"
-        original = (source + "\n" + thinking + personal).encode("utf-8")
-        target.write_bytes(original)
-        self.run_script("install.sh", "--migrate-legacy-playbook")
-        backups = list(self.home.glob(".backup-*/copilot-instructions.md"))
-        self.assertEqual(len(backups), 1)
-        self.assertEqual(backups[0].read_bytes(), original)
-        installed = target.read_bytes()
-        self.assertTrue(installed.startswith((thinking + personal).encode("utf-8")))
-        self.assertEqual(installed.count(source.encode("utf-8")), 1)
+    def test_repeat_install_replaces_entire_dedicated_file_and_backs_it_up(self):
         self.run_script("install.sh")
-        self.assertEqual(target.read_bytes(), installed)
-        self.run_script("uninstall.sh")
-        self.assertEqual(target.read_bytes(), (thinking + personal).encode("utf-8"))
-
-    def test_unknown_legacy_structure_aborts_even_with_migration_flag(self):
-        self.home.mkdir()
-        target = self.home / "copilot-instructions.md"
-        target.write_text("# Multi-agent team playbook\ncustomized routing\n", encoding="utf-8")
-        before = self.snapshot()
-        self.run_script("install.sh", "--migrate-legacy-playbook", expected=1)
-        self.assertEqual(self.snapshot(), before)
-        self.assertFalse((self.home / "agents").exists())
-
-    def test_tabbed_personal_heading_survives_migration_and_uninstall(self):
-        self.home.mkdir()
-        target = self.home / "copilot-instructions.md"
-        source = (ROOT / "copilot-instructions.md").read_bytes()
-        personal = b"#\tPersonal instructions\r\nkeep personal notes"
-        target.write_bytes(source + b"\n" + personal)
-        self.run_script("install.sh", "--migrate-legacy-playbook")
-        self.run_script("uninstall.sh")
-        self.assertEqual(target.read_bytes(), personal)
-
-    def test_bom_legacy_blocks_default_install_and_preserves_personal_content_on_migration(self):
-        self.home.mkdir()
-        target = self.home / "copilot-instructions.md"
-        source = (ROOT / "copilot-instructions.md").read_bytes()
-        personal = b"# Personal instructions\r\nkeep personal notes"
-        original = b"\xef\xbb\xbf" + source + b"\n" + personal
+        target = self.home / TEAM_INSTRUCTION
+        original = b"custom edits\r\n# Personal\nno final newline"
         target.write_bytes(original)
-        before = self.snapshot()
-        self.run_script("install.sh", expected=1)
-        self.assertEqual(self.snapshot(), before)
-        self.assertFalse((self.home / "agents").exists())
-        self.run_script("install.sh", "--migrate-legacy-playbook")
+        self.run_script("install.sh")
+        self.assertEqual(target.read_bytes(), self.expected_team_content())
+        backups = list(self.home.glob(".backup-*/" + TEAM_INSTRUCTION))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), original)
+        self.run_script("install.sh")
+        self.assertEqual(target.read_bytes(), self.expected_team_content())
+        self.assertEqual(len(list(self.home.glob(".backup-*/" + TEAM_INSTRUCTION))), 2)
+
+    def test_unset_copilot_home_uses_isolated_home_default(self):
+        del self.env["COPILOT_HOME"]
+        self.home = Path(self.env["HOME"]) / ".copilot"
+        self.run_script("install.sh")
+        self.assertEqual((self.home / TEAM_INSTRUCTION).read_bytes(), self.expected_team_content())
+        self.run_script("uninstall.sh")
+        self.assertFalse((self.home / TEAM_INSTRUCTION).exists())
+
+    def test_default_preserves_arbitrary_global_markdown_bytes(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        original = (
+            b"\xef\xbb\xbf#\tPersonal ###\r\nkeep notes  \r\n\r\n"
+            + (ROOT / "copilot-instructions.md").read_bytes()
+            + b"\nPersonal instructions\n=====\n```inline```\n```unclosed\nno final newline"
+        )
+        target.write_bytes(original)
+        for args in ((), ("--with-extras",)):
+            result = self.run_script("install.sh", *args)
+            self.assertIn("global instructions remain active and untouched", result.stdout)
+            self.assertIn("Clean up old team rules manually", result.stdout)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertEqual(list(self.home.glob(".backup-*/copilot-instructions.md")), [])
+        self.run_script("uninstall.sh")
+        self.assertEqual(target.read_bytes(), original)
+
+    def test_overwrite_global_replaces_everything_with_only_a_comment(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        original = (
+            b"\xef\xbb\xbf# Personal\r\nprivate notes\r\n# Build\nbuild rules\n"
+            b"# Thinking\nthinking rules\n" + (ROOT / "copilot-instructions.md").read_bytes()
+            + b"\n" + playbook.BEGIN.encode("utf-8") + b"\nunbalanced marker"
+        )
+        target.write_bytes(original)
+        result = self.run_script("install.sh", "--overwrite-global-instructions")
+        self.assertIn("WARNING: replacing ENTIRE copilot-instructions.md", result.stdout)
+        self.assertIn("all personal/build/thinking instructions in that file will be removed",
+                      result.stdout)
         backups = list(self.home.glob(".backup-*/copilot-instructions.md"))
         self.assertEqual(len(backups), 1)
         self.assertEqual(backups[0].read_bytes(), original)
+        self.assertEqual(target.read_bytes(), GLOBAL_COMMENT)
+        self.assertEqual((self.home / TEAM_INSTRUCTION).read_bytes(), self.expected_team_content())
         self.run_script("uninstall.sh")
-        self.assertEqual(target.read_bytes(), b"\xef\xbb\xbf" + personal)
+        self.assertEqual(target.read_bytes(), GLOBAL_COMMENT)
 
-    def test_inline_backticks_preserve_personal_section_during_migration(self):
+    def test_overwrite_global_when_absent_requires_no_prompt_or_backup(self):
+        self.run_script("install.sh", "--overwrite-global-instructions")
+        self.assertEqual((self.home / "copilot-instructions.md").read_bytes(), GLOBAL_COMMENT)
+        self.assertEqual(list(self.home.glob(".backup-*/copilot-instructions.md")), [])
+
+    def test_empty_global_stays_empty_without_notice(self):
         self.home.mkdir()
         target = self.home / "copilot-instructions.md"
-        source = (ROOT / "copilot-instructions.md").read_bytes()
-        personal = b"# Personal instructions\nkeep notes\n```python\nexample()\n```\n"
-        target.write_bytes(source + b"\n```inline```\n" + personal)
-        self.run_script("install.sh", "--migrate-legacy-playbook")
+        target.write_bytes(b"")
+        result = self.run_script("install.sh")
+        self.assertNotIn("global instructions remain active", result.stdout)
+        self.assertEqual(target.read_bytes(), b"")
+        self.run_script("uninstall.sh")
+        self.assertEqual(target.read_bytes(), b"")
+
+    def test_legacy_managed_global_is_untouched_on_install_and_stripped_on_uninstall(self):
+        self.home.mkdir()
+        target = self.home / "copilot-instructions.md"
+        personal = b"# Personal\r\nkeep notes without final newline"
+        target.write_bytes(personal)
+        with contextlib.redirect_stdout(io.StringIO()):
+            playbook.cmd_install(str(target), str(ROOT / "copilot-instructions.md"))
+        original = target.read_bytes()
+        self.run_script("install.sh")
+        self.assertEqual(target.read_bytes(), original)
         self.run_script("uninstall.sh")
         self.assertEqual(target.read_bytes(), personal)
+        self.assertFalse((self.home / TEAM_INSTRUCTION).exists())
 
-    def test_setext_personal_heading_aborts_before_any_installation_changes(self):
+    def test_dedicated_leaf_symlink_is_backed_up_replaced_and_removed_safely(self):
+        target = self.home / TEAM_INSTRUCTION
+        target.parent.mkdir(parents=True)
+        outside = self.home.parent / "outside"
+        outside.write_bytes(b"untouched\n")
+        target.symlink_to(outside)
+        self.run_script("install.sh")
+        self.assertFalse(target.is_symlink())
+        self.assertEqual(target.read_bytes(), self.expected_team_content())
+        backups = list(self.home.glob(".backup-*/" + TEAM_INSTRUCTION))
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0].is_symlink())
+        target.unlink()
+        target.symlink_to(outside)
+        self.run_script("uninstall.sh")
+        self.assertFalse(target.is_symlink())
+        self.assertEqual(outside.read_bytes(), b"untouched\n")
+
+    def test_global_leaf_symlink_is_only_replaced_with_explicit_consent(self):
         self.home.mkdir()
+        outside = self.home.parent / "outside"
+        outside.write_bytes(b"personal instructions\n")
         target = self.home / "copilot-instructions.md"
-        source = (ROOT / "copilot-instructions.md").read_bytes()
-        target.write_bytes(source + b"\nPersonal instructions\n=====\nkeep personal notes\n")
-        before = self.snapshot()
-        result = self.run_script("install.sh", "--migrate-legacy-playbook", expected=1)
-        self.assertIn("Setext", result.stderr)
-        self.assertEqual(self.snapshot(), before)
-        self.assertFalse((self.home / "agents").exists())
+        target.symlink_to(outside)
+        self.run_script("install.sh")
+        self.assertTrue(target.is_symlink())
+        self.assertEqual(list(self.home.glob(".backup-*/copilot-instructions.md")), [])
+        self.run_script("install.sh", "--overwrite-global-instructions")
+        self.assertFalse(target.is_symlink())
+        self.assertEqual(target.read_bytes(), GLOBAL_COMMENT)
+        backups = list(self.home.glob(".backup-*/copilot-instructions.md"))
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0].is_symlink())
+        self.assertEqual(outside.read_bytes(), b"personal instructions\n")
+
+    def test_dangling_instruction_symlinks_are_replaced_without_creating_referents(self):
+        self.home.mkdir()
+        missing = self.home.parent / "missing"
+        for name in (TEAM_INSTRUCTION, "copilot-instructions.md"):
+            target = self.home / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.symlink_to(missing)
+        self.run_script("install.sh", "--overwrite-global-instructions")
+        for name in (TEAM_INSTRUCTION, "copilot-instructions.md"):
+            self.assertFalse((self.home / name).is_symlink())
+            self.assertTrue(next(self.home.glob(".backup-*/" + name)).is_symlink())
+        target = self.home / TEAM_INSTRUCTION
+        target.unlink()
+        target.symlink_to(missing)
+        self.run_script("uninstall.sh")
+        self.assertFalse(target.is_symlink())
+        self.assertFalse(missing.exists())
+
+    def test_symlinked_instruction_directory_aborts_install_and_uninstall_before_changes(self):
+        outside = self.home.parent / "outside"
+        outside.mkdir()
+        self.home.mkdir()
+        (self.home / "instructions").symlink_to(outside, target_is_directory=True)
+        for command in ("install.sh", "uninstall.sh"):
+            result = self.run_script(command, expected=1)
+            self.assertIn("unsafe parent directory", result.stderr)
+            self.assertFalse((self.home / "agents").exists())
+            self.assertEqual(list(outside.iterdir()), [])
+
+    def test_unsafe_instruction_targets_abort_before_core_install(self):
+        for name, args in (
+            (TEAM_INSTRUCTION, ()),
+            ("copilot-instructions.md", ("--overwrite-global-instructions",)),
+        ):
+            for kind in ("directory", "directory-symlink", "fifo"):
+                with self.subTest(name=name, kind=kind):
+                    target = self.home / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    if kind == "directory":
+                        target.mkdir()
+                    elif kind == "directory-symlink":
+                        target.symlink_to(target.parent, target_is_directory=True)
+                    else:
+                        os.mkfifo(target)
+                    result = self.run_script("install.sh", *args, expected=1)
+                    self.assertIn("expected a", result.stderr)
+                    self.assertFalse((self.home / "agents").exists())
+                    if kind == "directory":
+                        target.rmdir()
+                    else:
+                        target.unlink()
+
+    def test_purge_global_still_requires_confirmation(self):
+        for reply, removed in (("n\n", False), ("yes\n", True)):
+            with self.subTest(reply=reply):
+                self.run_script("install.sh", "--overwrite-global-instructions")
+                self.run_script("uninstall.sh", "--purge-playbook", input_text=reply)
+                self.assertEqual((self.home / "copilot-instructions.md").exists(), not removed)
+                self.assertFalse((self.home / TEAM_INSTRUCTION).exists())
 
     def test_opt_in_persists_and_opt_out_clears_it(self):
         self.run_script("install.sh", "--with-extras")
@@ -380,6 +492,7 @@ class InstallIntegrationTests(unittest.TestCase):
         expected |= {p.name for p in (ROOT / "extras/agents").glob("*.agent.md")}
         self.assertEqual(self.installed_agents(), expected)
         instructions = {p.name for p in (ROOT / "extras/instructions").glob("*.md")}
+        instructions.add(Path(TEAM_INSTRUCTION).name)
         self.assertEqual({p.name for p in (self.home / "instructions").glob("*.md")},
                          instructions)
         self.run_script("install.sh")
@@ -430,6 +543,7 @@ class InstallIntegrationTests(unittest.TestCase):
         self.assertEqual(self.installed_agents(), set())
         self.assertEqual(personal.read_text(), "Personal instructions\n")
         self.assertEqual(unrelated.read_text(), "personal")
+        self.assertFalse((self.home / TEAM_INSTRUCTION).exists())
         self.assertFalse((self.home / extras.MANIFEST).exists())
 
     def test_bad_extras_manifest_aborts_before_core_changes(self):
@@ -450,7 +564,8 @@ class InstallIntegrationTests(unittest.TestCase):
         self.assertEqual(personal.read_bytes(), original)
 
     def test_help_and_unknown_option_do_not_install(self):
-        self.run_script("install.sh", "--help")
+        result = self.run_script("install.sh", "--help")
+        self.assertIn("--overwrite-global-instructions", result.stdout)
         self.run_script("install.sh", "--unknown", expected=1)
         self.assertFalse(self.home.exists())
 
@@ -461,7 +576,7 @@ class InstallIntegrationTests(unittest.TestCase):
         )
         self.run_script("install.sh")
         self.assertFalse((self.home / extras.MANIFEST).exists())
-        self.assertFalse((self.home / "instructions").exists())
+        self.assertEqual((self.home / TEAM_INSTRUCTION).read_bytes(), self.expected_team_content())
 
     def test_symlink_home_supports_core_and_optional_lifecycles(self):
         real_home = self.home.with_name("real-home")

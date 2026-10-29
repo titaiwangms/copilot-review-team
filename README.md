@@ -277,8 +277,8 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
 - The Critical Reviewer and QA Tester require `gpt-6.1-sol`; the Deep Reviewer
   requires `claude-sonnet-5.5`. Other roles still require their
   configured models or an explicitly chosen replacement.
-- `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
-  and by the self-checks).
+- `python3` on your PATH (used for optional extras, legacy managed-block
+  removal on uninstall, and the self-checks).
 - Bash 4 or newer (the installer uses associative arrays). On macOS, the
   system Bash 3 is insufficient; run the scripts with an installed Bash 4+.
 
@@ -296,6 +296,10 @@ Then start a fresh `copilot` session — the lead agent picks up the team
 automatically. If you're not sure it loaded, ask: *"what agents do you have?"*
 The installer copies all eight definitions and removes previously shipped
 duplicate variants recorded in its manifest.
+It installs the playbook as
+`~/.copilot/instructions/copilot-review-team.instructions.md` with
+`applyTo: "**"`. This dedicated file is backed up and replaced as a whole on
+updates; other instruction files are left alone.
 
 ### Optional building and thinking agents
 
@@ -356,31 +360,22 @@ counting the review complete. Keep shared definitions in this repo and
 re-run the installer rather than editing the deployed copies independently.
 `./install.sh --help` lists the optional install switches.
 
-> **NOTE — your existing `copilot-instructions.md` is preserved.** The installer
-> merges the playbook in as a **marker-delimited managed block**; anything you wrote
-> yourself stays put. Re-running `./install.sh` upgrades that block in place
-> (idempotent), and `./uninstall.sh` strips just the block, leaving your own
-> instructions behind. The file is also backed up to
-> `~/.copilot/.backup-<timestamp>-<pid>/` as a safety net.
-
-If an unmarked old playbook exists outside the managed markers, installation
-stops before changing agents or instructions. Review the reported section and,
-to explicitly migrate a recognized legacy layout, run:
+**Global instructions are preserved by default.** The installer does not parse
+or merge `~/.copilot/copilot-instructions.md`. If that file exists, it prints a
+notice: old team rules there remain active alongside the dedicated playbook.
+Remove obsolete rules manually, or explicitly discard the entire global file:
 
 ```bash
-./install.sh --migrate-legacy-playbook
+./install.sh --overwrite-global-instructions
 ```
 
-Migration backs up the original, removes the entire recognized review/build
-section (including custom edits within that section), and installs one managed
-playbook. Other top-level sections, including thinking and personal instructions,
-are preserved. A standalone `copilot-instructions.md.legacy-*.bak` backup is
-also kept alongside the target before the migration write. If the legacy layout
-cannot be recognized, even this flag refuses to remove it; back up and edit it
-manually instead. Tab-separated and empty ATX H1 headings delimit preserved
-sections. A possible Setext H1 boundary (`Title` followed by `===`) inside a
-proposed removal range blocks automatic migration rather than guessing which
-text belongs to it. Restart Copilot after migration to load the new routing.
+**This flag backs up and replaces the whole global file**, including all
+personal, building, and thinking instructions. Its replacement is only a comment
+pointing to the dedicated playbook, not a second copy of the rules. Backups are
+kept in `~/.copilot/.backup-<timestamp>-<pid>/`; restore any wanted personal
+instructions manually, or use `--with-extras` for the packaged building/thinking
+flows. No automatic Markdown migration is attempted. Restart Copilot after
+changing instructions.
 
 Re-running `./install.sh` is a versioned, in-place upgrade: it prints a
 `version -> version` change summary (added / updated / unchanged / removed agents)
@@ -396,21 +391,23 @@ Copilot CLI keeps its config somewhere other than the default `~/.copilot`.
 No installer? Copy the pieces by hand:
 
 ```bash
-mkdir -p ~/.copilot/agents
+mkdir -p ~/.copilot/agents ~/.copilot/instructions
 cp agents/local-*.agent.md ~/.copilot/agents/
-python3 scripts/_merge_playbook.py install \
-  ~/.copilot/copilot-instructions.md copilot-instructions.md
+{ printf '%s\n' '---' 'applyTo: "**"' '---' ''; cat copilot-instructions.md; } \
+  > ~/.copilot/instructions/copilot-review-team.instructions.md
 ```
 
-Use the merge helper rather than pasting an unmarked copy of the playbook; it
-preserves other instructions and keeps repeated updates idempotent.
+Back up an existing same-named file first. The installer does this automatically.
+Do not also paste the playbook into global instructions; both copies could load.
 
 For extras, prefer the installer: it records ownership for upgrades and removal
 and backs up existing same-named files.
 
 To remove the team later, run [`./uninstall.sh`](uninstall.sh) — it removes only
 the core agent names and manifest entries, plus any extras recorded in the extras
-manifest, and strips the playbook's managed block. Unrelated files are left alone.
+manifest, and deletes the dedicated playbook. For older installs it also strips
+the known marker-delimited managed block from global instructions; unmarked
+content is never inferred or deleted. Unrelated files are left alone.
 Use `--purge-playbook` to drop the whole
 `copilot-instructions.md` instead (it asks first).
 
