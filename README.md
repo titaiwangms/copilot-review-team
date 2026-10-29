@@ -56,7 +56,7 @@ own semantic tie-break.
 
 The playbook defines the full tiers; quick version:
 
-- **Trivial** (typo, one-liner, doc-only): the lead reads it; no team.
+- **Trivial** (typos, formatting, non-behavioral documentation): the lead reads it; no team.
 - **Routine** (bounded scope, no escalation trigger): lightweight pair.
 - **Risky or wide**: full reviewer fan-out; add the QA tester only when runtime
   evidence is needed.
@@ -199,16 +199,32 @@ revised diff before another review cycle begins.
 
 ### Escalation triggers
 
+Lightweight review is the default for behavioral changes, including one-line
+fixes. Merely touching a sensitive subsystem does not trigger full review:
+route by changed semantics and the evidence needed to check them.
+
 Use the full team immediately, or escalate from lightweight review, for:
 
-- authentication, authorization, secrets, cryptography, or untrusted input
-- destructive persistence, migrations, or data-format compatibility
-- public APIs, schemas, wire/event formats, ABI, or serialization
-- concurrency, locking, or resource lifecycles
-- external specifications, numerical proofs, or bit-level invariants
-- changes requiring transitive tracing beyond direct consumers
-- runtime behavior that cannot be settled by reading
-- a possible Critical issue, or scope/intent that cannot be bounded confidently
+- changes to authentication, authorization, secret handling, or cryptography
+- changes to how untrusted data crosses a trust boundary or reaches privileged
+  or destructive operations
+- changes to destructive persistence behavior, migration semantics, or
+  data-format compatibility
+- changes that break public API, schema, wire/event, ABI, or serialization
+  contracts, or whose compatibility cannot be established from direct consumers
+- changes to concurrency, locking, or resource ownership/lifetime semantics
+- changes to numerical/bit-level invariants, or correctness questions requiring
+  external specifications or proofs
+- evidence that review requires transitive tracing beyond direct consumers
+- a concrete correctness question requiring runtime evidence beyond ordinary
+  targeted tests, a possible Critical issue, or scope/intent that remains unclear
+  after bounded inspection
+
+A local parser error-path fix or an additive API helper whose compatibility is
+clear from direct consumers can stay lightweight. An auth bypass, changed wire
+format, or lock-order change requires full review even in a small diff. Each
+escalation cites changed behavior or an unresolved relationship, not just a
+category name.
 
 ### Severity levels
 
@@ -261,8 +277,8 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
 - The Critical Reviewer and QA Tester require `gpt-6.1-sol`; the Deep Reviewer
   requires `claude-sonnet-5.5`. Other roles still require their
   configured models or an explicitly chosen replacement.
-- `python3` on your PATH (used by `install.sh`/`uninstall.sh` to merge the playbook
-  and by the self-checks).
+- `python3` on your PATH (used for optional extras, legacy managed-block
+  removal on uninstall, and the self-checks).
 - Bash 4 or newer (the installer uses associative arrays). On macOS, the
   system Bash 3 is insufficient; run the scripts with an installed Bash 4+.
 
@@ -280,6 +296,10 @@ Then start a fresh `copilot` session — the lead agent picks up the team
 automatically. If you're not sure it loaded, ask: *"what agents do you have?"*
 The installer copies all eight definitions and removes previously shipped
 duplicate variants recorded in its manifest.
+It installs the playbook as
+`~/.copilot/instructions/copilot-review-team.instructions.md` with
+`applyTo: "**"`. This dedicated file is backed up and replaced as a whole on
+updates; other instruction files are left alone.
 
 ### Optional building and thinking agents
 
@@ -340,12 +360,22 @@ counting the review complete. Keep shared definitions in this repo and
 re-run the installer rather than editing the deployed copies independently.
 `./install.sh --help` lists the optional install switches.
 
-> **NOTE — your existing `copilot-instructions.md` is preserved.** The installer
-> merges the playbook in as a **marker-delimited managed block**; anything you wrote
-> yourself stays put. Re-running `./install.sh` upgrades that block in place
-> (idempotent), and `./uninstall.sh` strips just the block, leaving your own
-> instructions behind. The file is also backed up to
-> `~/.copilot/.backup-<timestamp>-<pid>/` as a safety net.
+**Global instructions are preserved by default.** The installer does not parse
+or merge `~/.copilot/copilot-instructions.md`. If that file exists, it prints a
+notice: old team rules there remain active alongside the dedicated playbook.
+Remove obsolete rules manually, or explicitly discard the entire global file:
+
+```bash
+./install.sh --overwrite-global-instructions
+```
+
+**This flag backs up and replaces the whole global file**, including all
+personal, building, and thinking instructions. Its replacement is only a comment
+pointing to the dedicated playbook, not a second copy of the rules. Backups are
+kept in `~/.copilot/.backup-<timestamp>-<pid>/`; restore any wanted personal
+instructions manually, or use `--with-extras` for the packaged building/thinking
+flows. No automatic Markdown migration is attempted. Restart Copilot after
+changing instructions.
 
 Re-running `./install.sh` is a versioned, in-place upgrade: it prints a
 `version -> version` change summary (added / updated / unchanged / removed agents)
@@ -361,18 +391,23 @@ Copilot CLI keeps its config somewhere other than the default `~/.copilot`.
 No installer? Copy the pieces by hand:
 
 ```bash
-mkdir -p ~/.copilot/agents
+mkdir -p ~/.copilot/agents ~/.copilot/instructions
 cp agents/local-*.agent.md ~/.copilot/agents/
-# then paste this repo's copilot-instructions.md into
-# ~/.copilot/copilot-instructions.md (append it; keep anything already there)
+{ printf '%s\n' '---' 'applyTo: "**"' '---' ''; cat copilot-instructions.md; } \
+  > ~/.copilot/instructions/copilot-review-team.instructions.md
 ```
+
+Back up an existing same-named file first. The installer does this automatically.
+Do not also paste the playbook into global instructions; both copies could load.
 
 For extras, prefer the installer: it records ownership for upgrades and removal
 and backs up existing same-named files.
 
 To remove the team later, run [`./uninstall.sh`](uninstall.sh) — it removes only
 the core agent names and manifest entries, plus any extras recorded in the extras
-manifest, and strips the playbook's managed block. Unrelated files are left alone.
+manifest, and deletes the dedicated playbook. For older installs it also strips
+the known marker-delimited managed block from global instructions; unmarked
+content is never inferred or deleted. Unrelated files are left alone.
 Use `--purge-playbook` to drop the whole
 `copilot-instructions.md` instead (it asks first).
 

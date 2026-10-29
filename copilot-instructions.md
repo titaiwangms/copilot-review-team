@@ -102,18 +102,37 @@ Don't run the full team for every review — match the fan-out to the change:
 
 | Change size | Review depth |
 |---|---|
-| Trivial (typo, one-line, doc-only) | Read it yourself; no team |
+| Trivial (typos, formatting, non-behavioral documentation) | Read it yourself; no team |
 | Routine (bounded scope, no escalation trigger) | Lightweight team in parallel |
 | Risky or wide | Full reviewer fan-out; add qa-tester only when runtime evidence is needed |
 
-Use the full team immediately when the change touches authentication,
-authorization, secrets, cryptography, untrusted input, destructive persistence,
-migrations, data-format compatibility, public APIs, schemas, wire/event formats,
-ABI, serialization, concurrency, locking, resource lifecycles, external
-specifications, numerical/bit-level invariants, or requires tracing beyond
-direct consumers. Also use it for a possible Critical issue, runtime behavior
-that cannot be settled by reading, or scope/intent that cannot be bounded
-confidently.
+Lightweight review is the default for behavioral changes, including one-line
+fixes. Route by the changed semantics and required evidence, not by filenames,
+keywords, or merely touching a sensitive subsystem. Non-behavioral edits in
+such a subsystem do not automatically require full review.
+
+Use the full team immediately, or escalate from lightweight review, for:
+
+- changes to authentication, authorization, secret handling, or cryptography
+- changes to how untrusted data crosses a trust boundary or reaches privileged
+  or destructive operations
+- changes to destructive persistence behavior, migration semantics, or
+  data-format compatibility
+- changes that break public API, schema, wire/event, ABI, or serialization
+  contracts, or whose compatibility cannot be established from direct consumers
+- changes to concurrency, locking, or resource ownership/lifetime semantics
+- changes to numerical/bit-level invariants, or correctness questions requiring
+  external specifications or proofs
+- evidence that review requires transitive tracing beyond direct consumers
+- a concrete correctness question requiring runtime evidence beyond ordinary
+  targeted tests, a possible Critical issue, or scope/intent that remains unclear
+  after bounded inspection
+
+For example, a local parser error-path fix or an additive API helper whose
+compatibility is clear from direct consumers can stay lightweight. An auth
+bypass, changed wire format, or lock-order change requires full review even
+when the diff is small. Cite the changed behavior or unresolved relationship
+that triggers full review; a category name alone is not evidence.
 
 ## Review pipeline
 

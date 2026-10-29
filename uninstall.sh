@@ -15,9 +15,9 @@
 #                        stripping our managed block (asks for confirmation first)
 #   -h, --help           show this help
 #
-# Default behavior strips this repo's managed block from copilot-instructions.md,
-# preserving any instructions you wrote yourself. If nothing else remains, the
-# file is removed.
+# Default behavior removes the exact dedicated team instruction file and strips
+# legacy managed blocks from copilot-instructions.md, preserving other global
+# content. If nothing else remains after stripping a block, the file is removed.
 #
 # Backup directories (~/.copilot/.backup-*/) are never deleted.
 # Optional extras are removed using their separate manifest.
@@ -30,6 +30,7 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COPILOT_DIR="${COPILOT_HOME:-$HOME/.copilot}"
 AGENTS_DIR="$COPILOT_DIR/agents"
 PLAYBOOK="$COPILOT_DIR/copilot-instructions.md"
+TEAM_INSTRUCTIONS="$COPILOT_DIR/instructions/copilot-review-team.instructions.md"
 MANIFEST="$COPILOT_DIR/.copilot-review-team-manifest"
 BACKUP_DIR="$COPILOT_DIR/.backup-$(date +%Y%m%d-%H%M%S)-$$"
 
@@ -89,6 +90,16 @@ fi
 # partial uninstall. Skip the check under --dry-run since nothing is removed.
 if [ "$DRY_RUN" -eq 0 ]; then
   command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 1; }
+  python3 - "$SRC_DIR/scripts" "$COPILOT_DIR" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from _manage_extras import check_target
+try:
+    check_target(Path(sys.argv[2]).resolve(), "instructions/copilot-review-team.instructions.md")
+except ValueError as error:
+    sys.exit("error: %s" % error)
+PY
   python3 "$SRC_DIR/scripts/_manage_extras.py" check-remove "$COPILOT_DIR" \
     "$BACKUP_DIR"
 fi
@@ -170,7 +181,13 @@ else
     "$BACKUP_DIR"
 fi
 
-# --- Playbook ---
+# --- Dedicated playbook (only this exact filename is owned) ---
+if [ -e "$TEAM_INSTRUCTIONS" ] || [ -L "$TEAM_INSTRUCTIONS" ]; then
+  run rm -f "$TEAM_INSTRUCTIONS"
+  echo "  remove instructions: instructions/copilot-review-team.instructions.md"
+fi
+
+# --- Legacy global playbook ---
 if [ "$PLAYBOOK_ACTION" = "purge" ]; then
   if [ -e "$PLAYBOOK" ]; then
     if [ "$DRY_RUN" -eq 1 ]; then

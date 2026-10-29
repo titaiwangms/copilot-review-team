@@ -52,21 +52,32 @@ beyond the bounded review requested by the lead.
 
 ## Escalate instead of expanding
 
-Stop and return `ESCALATE` when the change involves or requires:
+Judge the changed semantics, not filenames, keywords, or the presence of
+untrusted input. A local parser error-path fix or an additive API helper whose
+compatibility is clear from direct consumers can stay lightweight. Ordinary
+targeted tests do not by themselves require escalation; do not run them yourself.
 
-- authentication, authorization, secrets, cryptography, or untrusted input
-- destructive persistence, migrations, or data-format compatibility
-- public APIs, schemas, wire/event formats, ABI, or serialization contracts
-- concurrency, locking, or resource-lifecycle correctness
-- external specifications, numerical proofs, or bit-level invariants
-- transitive tracing beyond direct callers or consumers
-- runtime behavior that cannot be settled by reading
-- a possible Critical issue
-- scope or intent that cannot be understood with bounded context
+Stop and return `ESCALATE` for:
+
+- changes to authentication, authorization, secret handling, or cryptography
+- changes to how untrusted data crosses a trust boundary or reaches privileged
+  or destructive operations
+- changes to destructive persistence behavior, migration semantics, or
+  data-format compatibility
+- changes that break public API, schema, wire/event, ABI, or serialization
+  contracts, or whose compatibility cannot be established from direct consumers
+- changes to concurrency, locking, or resource ownership/lifetime semantics
+- changes to numerical/bit-level invariants, or correctness questions requiring
+  external specifications or proofs
+- evidence that review requires transitive tracing beyond direct consumers
+- a concrete correctness question requiring runtime evidence beyond ordinary
+  targeted tests, or a possible Critical issue
+- scope or intent that remains unclear after bounded inspection
 
 Do not investigate an escalation trigger deeply. State the trigger, preserve
 any concrete evidence already found, and hand off to the full five-reviewer
-team. Do not recommend a subset.
+team. Cite the changed behavior or unresolved relationship, not just a category
+name. Do not recommend a subset.
 
 ## Output contract
 

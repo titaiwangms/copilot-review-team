@@ -3,9 +3,10 @@
 # Installs the Copilot CLI Review Team into ~/.copilot/
 #
 #   - Copies the local-* agent definitions into ~/.copilot/agents/
-#   - Merges the orchestration playbook into ~/.copilot/copilot-instructions.md
-#     as a marker-delimited managed block (your own instructions are preserved)
+#   - Replaces the owned instructions/copilot-review-team.instructions.md
+#     with the orchestration playbook (existing content is backed up)
 #   - With --with-extras, installs optional agents/instructions tracked separately
+#   - Leaves global instructions untouched unless explicitly asked to overwrite
 #
 # Existing agent files are backed up to ~/.copilot/.backup-<timestamp>-<pid>/
 # before being overwritten, so this is safe to re-run.
@@ -27,15 +28,20 @@
 set -euo pipefail
 
 EXTRAS="auto"
+OVERWRITE_GLOBAL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --with-extras) EXTRAS="install" ;;
     --without-extras) EXTRAS="remove" ;;
+    --overwrite-global-instructions) OVERWRITE_GLOBAL=1 ;;
     -h|--help)
-      echo "Usage: ./install.sh [--with-extras | --without-extras]"
+      echo "Usage: ./install.sh [--with-extras | --without-extras] [--overwrite-global-instructions]"
       echo "Default: install the review team; preserve a previous extras opt-in."
       echo "  --with-extras     also install optional building/thinking agents and instructions"
       echo "  --without-extras  remove previously installed extras and clear the opt-in"
+      echo "  --overwrite-global-instructions  back up and replace the ENTIRE global instructions file"
+      echo "    WARNING: all personal/build/thinking instructions in that file will be removed."
+      echo "    The replacement is only a comment pointing to the dedicated team file."
       exit 0
       ;;
     *) echo "error: unknown argument: $1" >&2; exit 1 ;;
@@ -51,6 +57,9 @@ TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 # Include the PID so two runs within the same second can't clobber each other's
 # backups (which could otherwise overwrite the user's *original* files).
 BACKUP_DIR="$COPILOT_DIR/.backup-$TIMESTAMP-$$"
+PLAYBOOK="$COPILOT_DIR/copilot-instructions.md"
+INSTRUCTIONS_DIR="$COPILOT_DIR/instructions"
+TEAM_INSTRUCTIONS="$INSTRUCTIONS_DIR/copilot-review-team.instructions.md"
 
 # Version this install ships. Read robustly so a missing/blank VERSION file
 # can't abort the install under `set -e`.
@@ -79,9 +88,25 @@ fi
 
 echo "Installing Copilot Review Team into: $COPILOT_DIR"
 
-# python3 is required for the playbook merge step. Check BEFORE any destructive
-# work (agent copy/prune) so a missing interpreter can't leave a partial install.
+# python3 is required for extras management. Check BEFORE any destructive work
+# (agent copy/prune) so a missing interpreter can't leave a partial install.
 command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 1; }
+
+# Reuse the extras path safeguards for the dedicated file. Resolving the home
+# allows COPILOT_HOME itself to be a symlink, but not its instructions directory.
+python3 - "$SRC_DIR/scripts" "$COPILOT_DIR" "$OVERWRITE_GLOBAL" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from _manage_extras import check_target
+try:
+    home = Path(sys.argv[2]).resolve()
+    check_target(home, "instructions/copilot-review-team.instructions.md")
+    if sys.argv[3] == "1":
+        check_target(home, "copilot-instructions.md")
+except ValueError as error:
+    sys.exit("error: %s" % error)
+PY
 
 if [ "$EXTRAS" = "auto" ]; then
   EXTRAS="none"
@@ -130,9 +155,9 @@ is_safe_agent_name() {
   [[ "$name" =~ ^local-[A-Za-z0-9._-]+\.agent\.md$ ]]
 }
 
-# Write $1 (a source file) to $2 (target inside $AGENTS_DIR) safely. If $target
+# Write $1 (a source file) to $2 (an owned target file) safely. If $target
 # is a symlink we must NOT follow it: `cp` would dereference and clobber the
-# referent (which could live OUTSIDE $AGENTS_DIR). We write to a temp file in the
+# referent (which could live OUTSIDE $COPILOT_DIR). We write to a temp file in the
 # same directory and `mv` it into place — atomic, and (since $target is always
 # a fixed non-directory path here) it replaces the target itself rather than
 # writing through it, even without GNU's `-T`. Behavior for a regular-file
@@ -227,18 +252,31 @@ if [ "${#PREV_AGENTS[@]}" -gt 0 ]; then
   done
 fi
 
-# --- Playbook ---
-# We DON'T clobber an existing copilot-instructions.md: the playbook is merged in
-# as a marker-delimited managed block, so any instructions you wrote yourself are
-# preserved. We still back the file up first as a safety net.
-PLAYBOOK="$COPILOT_DIR/copilot-instructions.md"
+# --- Dedicated playbook ---
+# This exact named file is ours; replace its entire content, never parse Markdown.
+mkdir -p "$INSTRUCTIONS_DIR"
+instruction_src="$(mktemp "$COPILOT_DIR/.tmp-instructions.XXXXXX")"
+trap 'rm -f "$instruction_src"' EXIT
+{
+  printf '%s\n' '---' 'applyTo: "**"' '---' ''
+  cat "$SRC_DIR/copilot-instructions.md"
+} > "$instruction_src"
+chmod 644 "$instruction_src"
+backup "$TEAM_INSTRUCTIONS"
+install_file "$instruction_src" "$TEAM_INSTRUCTIONS"
+echo "  playbook: installed instructions/copilot-review-team.instructions.md"
 
-if [ -e "$PLAYBOOK" ]; then
-  echo "  NOTE: existing copilot-instructions.md found — backing it up."
+if [ "$OVERWRITE_GLOBAL" -eq 1 ]; then
+  echo "  WARNING: replacing ENTIRE copilot-instructions.md; all personal/build/thinking instructions in that file will be removed."
+  backup "$PLAYBOOK"
+  printf '%s\n' '<!-- Review team instructions: instructions/copilot-review-team.instructions.md -->' > "$instruction_src"
+  install_file "$instruction_src" "$PLAYBOOK"
+elif [ -s "$PLAYBOOK" ]; then
+  echo "  NOTE: existing global instructions remain active and untouched."
+  echo "        Clean up old team rules manually, or use --overwrite-global-instructions to back up and replace the ENTIRE global file."
 fi
-backup "$PLAYBOOK"   # safety net retained
-python3 "$SRC_DIR/scripts/_merge_playbook.py" install "$PLAYBOOK" "$SRC_DIR/copilot-instructions.md"
-echo "  playbook: merged managed block into copilot-instructions.md"
+rm -f "$instruction_src"
+trap - EXIT
 
 if [ "$EXTRAS" != "none" ]; then
   python3 "$SRC_DIR/scripts/_manage_extras.py" "$EXTRAS" "$COPILOT_DIR" "$BACKUP_DIR"

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Marker-block merge for the review-team playbook.
 
-Used by BOTH install.sh and uninstall.sh to manage this repo's content inside a
-user's copilot-instructions.md without clobbering anything they wrote. Our
+Retained for backward-compatible uninstall of known managed blocks; install.sh
+now installs a dedicated instruction file instead. The legacy managed
 content lives between two sentinel markers; everything outside the markers is the
 user's and is preserved verbatim.
 
