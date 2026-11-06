@@ -43,7 +43,7 @@ anything.
   Claude Sonnet 5.5. There are no automatic model fallbacks or duplicate model
   variants. Update both README and playbook roster rows when adding or renaming
   an agent. The Critical Reviewer can share the developer's model, so retain
-  the independent Claude/Grok counterweights. The Deep Reviewer preserves its
+  the independent Claude/MAI counterweights. The Deep Reviewer preserves its
   authority/evidence requirements but shares the Readability Reviewer's model;
   do not treat unresolved proofs as approvals.
   Do not reinterpret unrelated failures as
@@ -51,8 +51,7 @@ anything.
 
 - **Bump `VERSION` for a new release, not every unreleased commit or PR.** Multiple
   PRs for the same upcoming release share its version, even if `main` already
-  carries that unreleased number. The current optional-agent and model changes
-  are part of the unreleased `2.4.0`; do not bump them independently.
+  carries that unreleased number.
   The file holds a single semver line
   (e.g. `1.0.0`). `install.sh` reads it to stamp the install and to print a
   `version -> version` change summary on upgrade. The install manifest
