@@ -87,7 +87,7 @@ repository test failures; those follow the sub-agent failure policy. An
 unavailable-model attempt is not a completed review round and does not reset
 the two-round cap. The Critical Reviewer may
 share the developer's model and the Code Reviewer's model, so retain the
-independent Claude and Grok review lenses. QA follows the same
+independent Claude and MAI review lenses. QA follows the same
 execution limits and exact-scenario evidence contract.
 
 The Deep Reviewer uses Claude Sonnet 5.5, sharing the Readability Reviewer's
@@ -321,14 +321,16 @@ arbitrary (sometimes hostile) code, which is exactly where prompt injection happ
 
 ## Model diversity rationale (don't change without thinking)
 
-The lightweight pair is configured for **MAI-Code-2-Flash + Claude Sonnet 5.5** so routine
-review is fast and supplies two distinct model-family perspectives. Credit this diversity only after actual-model verification.
+The lightweight pair is configured for **MAI-Code-2.x1 (Preview) + Claude Sonnet 5.5**
+and supplies two distinct model-family perspectives. Credit this diversity only after actual-model verification.
+The lightweight code reviewer and full-team integration reviewer share
+MAI-Code-2.x1 (Preview); do not count those two roles as independent model lenses.
 The full
 team is intentionally split across model families so deep escalation does not
 share one model's blind spots:
 
 - Code Reviewer + Critical Reviewer use **GPT-6.1 Sol**, potentially sharing
-  the developer's model, while Claude and Grok reviewers provide cross-family
+  the developer's model, while Claude and MAI reviewers provide cross-family
   counterweights
 - Readability Reviewer is **Claude sonnet** (clarity is a fresh-reader lens, not
   adversarial)
@@ -336,9 +338,8 @@ share one model's blind spots:
   multi-file invariants; acts as tie-breaker when the GPT reviewers disagree on a
   math/spec claim). It shares the Readability Reviewer's model while preserving
   distinct evidence requirements.
-- Integration Reviewer is **Grok 4.7** (third model family — a fresh blind-spot
-  set neither Claude nor GPT shares; its large context window fits bounded
-  cross-module producer/consumer tracing)
+- Integration Reviewer is **MAI-Code-2.x1 (Preview)** (third full-team model
+  family for bounded cross-module producer/consumer tracing)
 - QA Tester is **GPT-6.1 Sol** (it runs the code, authors repros, brings up cold/
   misconfigured builds, and drives sanitizers/benchmarks — a long-horizon,
   agentic-reasoning-heavy instrument role. Family diversity isn't the point here;

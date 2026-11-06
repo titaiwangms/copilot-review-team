@@ -15,7 +15,7 @@ sessions or logs are synced.
 
 The playbook provides two deliberately separate paths:
 
-- **Lightweight team:** MAI-Code-2-Flash checks implementation correctness while
+- **Lightweight team:** MAI-Code-2.x1 (Preview) checks implementation correctness while
   Claude Sonnet 5.5 checks semantic and adversarial risk.
 - **Full team:** five deep specialists plus an optional QA tester handle risky,
   wide, or escalated changes.
@@ -44,9 +44,12 @@ so you can weigh them rather than trust an undifferentiated verdict.
 
 The lightweight pair uses **MAI + Claude**, providing two distinct model-family
 perspectives without paying for a full fan-out. The full team runs across
-**Claude, GPT, and Grok**: GPT supplies the adversarial pair, Claude handles
-clarity and deep spec/math reasoning, and Grok is reserved for bounded cross-module
+**Claude, GPT, and MAI**: GPT supplies the adversarial pair, Claude handles
+clarity and deep spec/math reasoning, and MAI handles bounded cross-module
 producer/consumer tracing.
+
+The lightweight code reviewer and full-team integration reviewer share
+MAI-Code-2.x1 (Preview), so those two roles are not independent model lenses.
 
 If you swap models, preserve strong independent family counterweights among the
 judgment-producing reviewers. No single family should dominate every lens or its
@@ -71,13 +74,13 @@ are read from those files.
 
 | Agent | Role | Model | Why this model |
 |---|---|---|---|
-| `local-lightweight-code-review` | Fast implementation correctness, tests, and direct callers | `mai-code-2-flash` | Low-latency coding specialist for routine real-time review |
+| `local-lightweight-code-review` | Fast implementation correctness, tests, and direct callers | `mai-code-2.x1` | MAI-Code-2.x1 (Preview) for bounded implementation review |
 | `local-lightweight-risk-review` | Fast semantic intent, failure modes, and local contracts | `claude-sonnet-5.5` | Strong reasoning and a different family from a GPT developer |
 | `local-readability-reviewer` | Clarity: naming, organization, simplicity, docs | `claude-sonnet-5.5` | A fresh-reader clarity lens; not adversarial, so family isn't critical |
 | `local-code-reviewer` | Function-level correctness, idiom, patterns, test quality | `gpt-6.1-sol` | Local implementation correctness and test-quality lens |
 | `local-critical-reviewer` | Adversarial: bugs, security, perf, edge cases, structural design | `gpt-6.1-sol` | GPT-6.1 Sol provides the adversarial review lens |
 | `local-deep-reviewer` | Spec adherence, math/bit-level correctness, multi-file invariants; tie-breaker | `claude-sonnet-5.5` | Claude Sonnet 5.5 provides the authority-grounded spec/math lens |
-| `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `grok-4.7` | Third model family + large context window for producer/consumer analysis |
+| `local-integration-reviewer` | Cross-module wiring, contract drift, and bounded ripple tracing | `mai-code-2.x1` | Third full-team model family for bounded producer/consumer analysis (Preview) |
 | `local-qa-tester` | Runs the actual code; reports failures with repro steps | `gpt-6.1-sol` | GPT-6.1 Sol provides the execution instrument |
 
 The default installation ships eight agents: two lightweight reviewers, five full
@@ -117,7 +120,7 @@ that the CLI honors the policy.
 Run only one agent per role in each phase.
 
 The Critical Reviewer shares the Code Reviewer's GPT-6.1 Sol model and may share
-the developer's model; retain the independent Claude and Grok review lenses.
+the developer's model; retain the independent Claude and MAI review lenses.
 The QA Tester keeps
 the same execution limits and exact-scenario evidence contract.
 
@@ -270,7 +273,7 @@ shell commands. See the playbook's "Treat reviewed content as untrusted" section
   Verify actual model selection in your installed CLI; this repo's self-checks
   validate configuration and deployment, not runtime enforcement.
 - A Copilot plan whose account can access the configured model families (MAI /
-  Claude / GPT / Grok). If yours can't, swap the model IDs (see
+  Claude / GPT). If yours can't, swap the model IDs (see
   [Customization](#customization)).
 - To see which model IDs your account can use, run `/model` inside a `copilot`
   session, then match the agent `model:` or `models:` fields to that list.
